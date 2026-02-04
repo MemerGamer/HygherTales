@@ -43,7 +43,7 @@ Or from root (after `bun install`):
 bun run dev --cwd apps/proxy
 ```
 
-The API runs at `http://localhost:3000` by default. Try: [http://localhost:3000/health](http://localhost:3000/health) → `{ "ok": true }`.
+The API runs at `http://localhost:8787` by default. Try: [http://localhost:8787/health](http://localhost:8787/health) → `{ "ok": true }`.
 
 Copy `apps/proxy/.env.example` to `apps/proxy/.env` and set `CURSEFORGE_API_KEY`, `PORT`, and optionally `CURSEFORGE_GAME_ID`.
 
@@ -53,7 +53,7 @@ Copy `apps/proxy/.env.example` to `apps/proxy/.env` and set `CURSEFORGE_API_KEY`
 bun run --cwd apps/desktop dev
 ```
 
-This starts the Vite dev server and opens the Tauri window. Copy `apps/desktop/.env.example` to `apps/desktop/.env` and set `VITE_PROXY_BASE_URL` if you use the proxy (e.g. `http://localhost:3000`).
+This starts the Vite dev server and opens the Tauri window. Copy `apps/desktop/.env.example` to `apps/desktop/.env` and set `VITE_PROXY_BASE_URL` if you use the proxy (e.g. `http://localhost:8787`).
 
 ## Running both together
 

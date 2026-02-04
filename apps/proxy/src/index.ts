@@ -1,14 +1,8 @@
-import { Hono } from "hono";
-
-const app = new Hono();
-
-app.get("/health", (c) => {
-  return c.json({ ok: true as const });
-});
-
-const port = Number(Bun.env.PORT) || 3000;
+import { env } from "./lib/env.js";
+import app from "./app.js";
 
 Bun.serve({
-  port,
+  port: env.PORT,
   fetch: app.fetch,
 });
+console.log(`HygherTales proxy listening on http://localhost:${env.PORT}`);
