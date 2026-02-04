@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { PageContainer } from "../components/layout/PageContainer";
+import { Button } from "../components/ui";
 
 interface HomeProps {
   gameExePath: string | null;
@@ -26,32 +28,34 @@ export function Home({ gameExePath }: HomeProps) {
   }
 
   return (
-    <section className="page">
-      <h2>Home</h2>
-      <p>
+    <PageContainer title="Home">
+      <p className="text-[var(--color-text)] leading-relaxed mb-6">
         Welcome to HygherTales. Use the menu to browse mods, view installed mods,
         or change settings.
       </p>
-      <div className="home-launch">
-        <button
-          type="button"
-          className="home-launch-btn"
+      <div className="mt-8 space-y-4">
+        <Button
+          variant="primary"
+          size="lg"
           onClick={handleLaunch}
           disabled={!gameExePath?.trim()}
         >
           Launch Hytale
-        </button>
+        </Button>
         {!gameExePath?.trim() && (
-          <p className="home-launch-hint">
+          <p className="text-sm text-[var(--color-text-muted)]">
             Configure the game executable in Settings to enable Launch.
           </p>
         )}
         {launchError && (
-          <p className="error-banner" role="alert">
+          <div
+            className="p-3 bg-[var(--color-danger)] border border-[rgba(220,80,80,0.6)] rounded text-[#ffb3b3]"
+            role="alert"
+          >
             {launchError}
-          </p>
+          </div>
         )}
       </div>
-    </section>
+    </PageContainer>
   );
 }

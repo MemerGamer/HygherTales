@@ -28,6 +28,8 @@ import { open as openFileDialog, save as saveFileDialog } from "@tauri-apps/plug
 import { getModFiles, getDownloadUrlCurseForge, getDownloadUrlOrbis, ApiError } from "../lib/api";
 import { getLatestFile, isUpdateAvailable } from "../lib/updates";
 import type { ModFile } from "@hyghertales/shared";
+import { PageContainer } from "../components/layout/PageContainer";
+import { Button, Input, Card, Modal, Badge, Spinner } from "../components/ui";
 
 /** Mods.disabled path from Mods path (e.g. .../UserData/Mods -> .../UserData/Mods.disabled). */
 function getDisabledDir(modsDir: string): string {
@@ -781,26 +783,29 @@ export function Installed({ modsDirPath, proxyBaseUrl }: InstalledProps) {
 
   const hasAnyUpdate = Object.keys(updateMap).length > 0;
 
+  const selectStyles =
+    "px-3 py-2 bg-[rgba(255,255,255,0.1)] border border-[var(--color-border)] rounded text-[var(--color-text)] transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#1a1a1a] focus:ring-[rgba(100,160,100,0.6)] disabled:opacity-60 disabled:cursor-not-allowed";
+
   if (!modsDirPath?.trim()) {
     return (
-      <section className="page">
-        <h2>Installed mods</h2>
-        <p className="error-banner">
+      <PageContainer title="Installed mods">
+        <div className="p-3 bg-[var(--color-danger)] border border-[rgba(220,80,80,0.6)] rounded text-[#ffb3b3]">
           Set the Mods directory in Settings to manage installed mods.
-        </p>
-      </section>
+        </div>
+      </PageContainer>
     );
   }
 
   return (
-    <section className="page">
-      <h2>Installed mods</h2>
-      <div className="profile-switcher">
-        <label className="profile-switcher-label">
+    <PageContainer title="Installed mods">
+      {/* Profile switcher */}
+      <div className="flex flex-wrap items-center gap-3 mb-6 pb-6 border-b border-[var(--color-border)]">
+        <label className="flex items-center gap-2 text-sm text-[var(--color-text)]">
           Profile
           <select
             value={profilesData?.activeProfileId ?? ""}
             aria-label="Active profile"
+            className={selectStyles}
             onChange={(e) => {
               const v = e.target.value;
               if (v === "") {
@@ -828,18 +833,18 @@ export function Installed({ modsDirPath, proxyBaseUrl }: InstalledProps) {
             ))}
           </select>
         </label>
-        <div className="profile-switcher-buttons">
-          <button
-            type="button"
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
             onClick={() => {
               setProfileModal("create");
               setCreateProfileDraft({ name: "", fromCurrent: true });
             }}
           >
             Create
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            size="sm"
             disabled={!activeProfile}
             onClick={() => {
               if (activeProfile) {
@@ -849,455 +854,485 @@ export function Installed({ modsDirPath, proxyBaseUrl }: InstalledProps) {
             }}
           >
             Rename
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            size="sm"
+            variant="danger"
             disabled={!activeProfile}
             onClick={() =>
               activeProfile && setProfileModal({ delete: activeProfile })
             }
           >
             Delete
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            size="sm"
             disabled={!activeProfile}
             onClick={() => activeProfile && handleExportProfile(activeProfile)}
           >
             Export
-          </button>
-          <button type="button" onClick={handleImportProfile}>
+          </Button>
+          <Button size="sm" onClick={handleImportProfile}>
             Import
-          </button>
+          </Button>
         </div>
       </div>
-      <div className="installed-toolbar">
-        <button type="button" onClick={runRescan} disabled={loading}>
+
+      {/* Toolbar */}
+      <div className="flex flex-wrap gap-2 mb-6">
+        <Button onClick={runRescan} disabled={loading} size="sm">
           Rescan folders
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
           onClick={checkUpdates}
           disabled={loading || checkingUpdates}
+          size="sm"
+          isLoading={checkingUpdates}
         >
-          {checkingUpdates ? "Checking…" : "Check updates"}
-        </button>
+          Check updates
+        </Button>
         {hasAnyUpdate && (
-          <button
-            type="button"
-            className="installed-update-all"
+          <Button
+            variant="primary"
             onClick={updateAll}
             disabled={updatingIds.size > 0}
+            size="sm"
+            isLoading={updatingIds.size > 0}
           >
-            {updatingIds.size > 0 ? "Updating…" : "Update all"}
-          </button>
+            Update all
+          </Button>
         )}
       </div>
+
+      {/* Error messages */}
       {updateError && (
-        <div className="error-banner" role="alert">
+        <div
+          className="p-3 mb-4 bg-[var(--color-danger)] border border-[rgba(220,80,80,0.6)] rounded text-[#ffb3b3]"
+          role="alert"
+        >
           {updateError}
         </div>
       )}
       {exportImportError && (
-        <div className="error-banner" role="alert">
+        <div
+          className="p-3 mb-4 bg-[var(--color-danger)] border border-[rgba(220,80,80,0.6)] rounded text-[#ffb3b3]"
+          role="alert"
+        >
           {exportImportError}
         </div>
       )}
       {actionError && (
-        <div className="error-banner" role="alert">
+        <div
+          className="p-3 mb-4 bg-[var(--color-danger)] border border-[rgba(220,80,80,0.6)] rounded text-[#ffb3b3]"
+          role="alert"
+        >
           {actionError}
         </div>
       )}
       {error && (
-        <div className="error-banner" role="alert">
+        <div
+          className="p-3 mb-4 bg-[var(--color-danger)] border border-[rgba(220,80,80,0.6)] rounded text-[#ffb3b3]"
+          role="alert"
+        >
           {error}
         </div>
       )}
+
+      {/* Loading state */}
       {loading ? (
-        <p>Loading…</p>
+        <div className="flex justify-center py-12">
+          <Spinner size="lg" />
+        </div>
       ) : mods.length === 0 ? (
-        <p>No mods in the database. Install mods from Browse (downloads go to your Mods folder).</p>
+        <p className="text-[var(--color-text-muted)]">
+          No mods in the database. Install mods from Browse (downloads go to your Mods folder).
+        </p>
       ) : (
-        <ul className="installed-list">
+        <div className="space-y-3">
           {mods.map((mod) => {
             const key = updateKey(mod);
             const latestFile = updateMap[key];
             const updateAvailable = latestFile != null && !mod.pinned;
             const isUpdating = mod.id != null && updatingIds.has(mod.id);
             return (
-              <li key={mod.id ?? mod.installedFilename} className="installed-item">
-                <div className="installed-info">
-                  <strong>
-                    {isUntracked(mod) ? mod.installedFilename : mod.name}
+              <Card
+                key={mod.id ?? mod.installedFilename}
+                className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-semibold text-white">
+                      {isUntracked(mod) ? mod.installedFilename : mod.name}
+                    </h3>
                     {updateAvailable && (
-                      <span className="installed-badge">Update available</span>
+                      <Badge variant="success">Update available</Badge>
                     )}
-                  </strong>
-                  <span className="installed-meta">
+                  </div>
+                  <div className="text-xs text-[var(--color-text-muted)]">
                     {mod.installedFilename}
                     {" · "}
                     {new Date(mod.installedAt).toLocaleDateString()}
                     {" · "}
                     {mod.enabled ? "Enabled" : "Disabled"}
                     {mod.pinned && " · Pinned"}
-                  </span>
+                  </div>
                 </div>
-                <div className="installed-actions">
+                <div className="flex flex-wrap gap-2">
                   {!isUntracked(mod) && (
-                    <label className="installed-pinned">
+                    <label className="flex items-center gap-1.5 text-sm text-[var(--color-text)] cursor-pointer">
                       <input
                         type="checkbox"
                         checked={!!mod.pinned}
                         onChange={() => togglePinned(mod)}
+                        className="cursor-pointer"
                       />
                       Pinned
                     </label>
                   )}
                   {updateAvailable && (
-                    <button
-                      type="button"
-                      className="installed-update-btn"
+                    <Button
+                      size="sm"
+                      variant="primary"
                       onClick={() => updateOne(mod)}
                       disabled={isUpdating}
+                      isLoading={isUpdating}
                     >
-                      {isUpdating ? "Updating…" : "Update"}
-                    </button>
+                      Update
+                    </Button>
                   )}
-                  <button
-                    type="button"
+                  <Button
+                    size="sm"
                     onClick={() => toggleEnabled(mod)}
                     title={mod.enabled ? "Disable" : "Enable"}
                   >
                     {mod.enabled ? "Disable" : "Enable"}
-                  </button>
-                  <button type="button" onClick={() => openInFolder(mod)}>
+                  </Button>
+                  <Button size="sm" onClick={() => openInFolder(mod)}>
                     Open in folder
-                  </button>
-                  <button
-                    type="button"
-                    className="installed-remove"
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="danger"
                     onClick={() => setRemoveConfirm(mod)}
                   >
                     Remove
-                  </button>
+                  </Button>
                 </div>
-              </li>
+              </Card>
             );
           })}
-        </ul>
-      )}
-
-      {removeConfirm && (
-        <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal">
-            <div className="modal-header">
-              <h3>Remove mod?</h3>
-              <button
-                type="button"
-                className="modal-close"
-                onClick={() => setRemoveConfirm(null)}
-                aria-label="Close"
-              >
-                ×
-              </button>
-            </div>
-            <div className="modal-body">
-              <p>
-                Move &quot;{removeConfirm.installedFilename}&quot; to Trash? You can restore it from
-                the Recycle Bin.
-              </p>
-              <div className="modal-actions">
-                <button type="button" onClick={() => setRemoveConfirm(null)}>
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="danger-button"
-                  onClick={() => handleRemove(removeConfirm)}
-                >
-                  Move to Trash
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
-      {rescanModal && (
-        <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal modal-wide">
-            <div className="modal-header">
-              <h3>Untracked files</h3>
-              <button
-                type="button"
-                className="modal-close"
-                onClick={ignoreUntracked}
-                aria-label="Close"
-              >
-                ×
-              </button>
-            </div>
-            <div className="modal-body">
-              {rescanModal.inMods.length > 0 && (
-                <>
-                  <h4>In Mods/</h4>
-                  <ul className="rescan-list">
-                    {rescanModal.inMods.map((f) => (
-                      <li key={f}>
-                        {f}{" "}
-                        <button type="button" onClick={() => addUntracked(f, true)}>
-                          Add as enabled
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
-              {rescanModal.inDisabled.length > 0 && (
-                <>
-                  <h4>In Mods.disabled/</h4>
-                  <ul className="rescan-list">
-                    {rescanModal.inDisabled.map((f) => (
-                      <li key={f}>
-                        {f}{" "}
-                        <button type="button" onClick={() => addUntracked(f, false)}>
-                          Add as disabled
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              )}
-              <p className="rescan-hint">Add tracks the file in the database. Close to ignore.</p>
-              <button type="button" onClick={ignoreUntracked}>
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Remove confirmation modal */}
+      <Modal
+        isOpen={removeConfirm !== null}
+        onClose={() => setRemoveConfirm(null)}
+        title="Remove mod?"
+        footer={
+          <>
+            <Button onClick={() => setRemoveConfirm(null)}>Cancel</Button>
+            <Button
+              variant="danger"
+              onClick={() => removeConfirm && handleRemove(removeConfirm)}
+            >
+              Move to Trash
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[var(--color-text)]">
+          Move &quot;{removeConfirm?.installedFilename}&quot; to Trash? You can
+          restore it from the Recycle Bin.
+        </p>
+      </Modal>
 
-      {profileModal === "create" && createProfileDraft != null && (
-        <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal">
-            <div className="modal-header">
-              <h3>Create profile</h3>
-              <button
-                type="button"
-                className="modal-close"
-                onClick={() => {
-                  setProfileModal(null);
-                  setCreateProfileDraft(null);
-                }}
-                aria-label="Close"
-              >
-                ×
-              </button>
-            </div>
-            <div className="modal-body">
-              <label>
-                Name
-                <input
-                  type="text"
-                  value={createProfileDraft.name}
-                  onChange={(e) =>
-                    setCreateProfileDraft((d) =>
-                      d ? { ...d, name: e.target.value } : d
-                    )
-                  }
-                  placeholder="Profile name"
-                />
-              </label>
-              <label className="profile-create-from-current">
-                <input
-                  type="checkbox"
-                  checked={createProfileDraft.fromCurrent}
-                  onChange={(e) =>
-                    setCreateProfileDraft((d) =>
-                      d ? { ...d, fromCurrent: e.target.checked } : d
-                    )
-                  }
-                />
-                Start from current enabled mod set
-              </label>
-              <div className="modal-actions">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setProfileModal(null);
-                    setCreateProfileDraft(null);
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={!createProfileDraft.name.trim()}
-                  onClick={() =>
-                    handleCreateProfile(
-                      createProfileDraft.name,
-                      createProfileDraft.fromCurrent
-                    )
-                  }
-                >
-                  Create
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {profileModal !== null && profileModal !== "create" && "rename" in profileModal && (
-        <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal">
-            <div className="modal-header">
-              <h3>Rename profile</h3>
-              <button
-                type="button"
-                className="modal-close"
-                onClick={() => {
-                  setProfileModal(null);
-                  setRenameProfileDraft("");
-                }}
-                aria-label="Close"
-              >
-                ×
-              </button>
-            </div>
-            <div className="modal-body">
-              <label>
-                Name
-                <input
-                  type="text"
-                  value={renameProfileDraft}
-                  onChange={(e) => setRenameProfileDraft(e.target.value)}
-                  placeholder="Profile name"
-                />
-              </label>
-              <div className="modal-actions">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setProfileModal(null);
-                    setRenameProfileDraft("");
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={!renameProfileDraft.trim()}
-                  onClick={() =>
-                    handleRenameProfile(profileModal.rename.id, renameProfileDraft)
-                  }
-                >
-                  Rename
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {profileModal !== null && profileModal !== "create" && "delete" in profileModal && (
-        <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal">
-            <div className="modal-header">
-              <h3>Delete profile?</h3>
-              <button
-                type="button"
-                className="modal-close"
-                onClick={() => setProfileModal(null)}
-                aria-label="Close"
-              >
-                ×
-              </button>
-            </div>
-            <div className="modal-body">
-              <p>
-                Delete profile &quot;{profileModal.delete.name}&quot;? This does
-                not remove any mod files.
-              </p>
-              <div className="modal-actions">
-                <button type="button" onClick={() => setProfileModal(null)}>
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="danger-button"
-                  onClick={() => handleDeleteProfile(profileModal.delete)}
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {switchDryRun && (
-        <div className="modal-overlay" role="dialog" aria-modal="true">
-          <div className="modal modal-wide">
-            <div className="modal-header">
-              <h3>Switch to &quot;{switchDryRun.profile.name}&quot;</h3>
-              <button
-                type="button"
-                className="modal-close"
-                onClick={cancelSwitchDryRun}
-                disabled={applyingProfile}
-                aria-label="Close"
-              >
-                ×
-              </button>
-            </div>
-            <div className="modal-body">
-              {switchDryRun.progress ? (
-                <p>
-                  Applying… {switchDryRun.progress.done} / {switchDryRun.progress.total} files
-                  moved.
-                </p>
-              ) : (
-                <>
-                  <p>Summary: the following mods will be moved (no files will be deleted).</p>
-                  {switchDryRun.toEnable.length > 0 && (
-                    <>
-                      <h4>Enable ({switchDryRun.toEnable.length})</h4>
-                      <ul className="rescan-list">
-                        {switchDryRun.toEnable.map((m) => (
-                          <li key={m.id}>{m.name}</li>
-                        ))}
-                      </ul>
-                    </>
-                  )}
-                  {switchDryRun.toDisable.length > 0 && (
-                    <>
-                      <h4>Disable ({switchDryRun.toDisable.length})</h4>
-                      <ul className="rescan-list">
-                        {switchDryRun.toDisable.map((m) => (
-                          <li key={m.id}>{m.name}</li>
-                        ))}
-                      </ul>
-                    </>
-                  )}
-                  <div className="modal-actions">
-                    <button type="button" onClick={cancelSwitchDryRun}>
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={applyProfileSwitch}
-                      disabled={applyingProfile}
+      {/* Rescan modal */}
+      <Modal
+        isOpen={rescanModal !== null}
+        onClose={ignoreUntracked}
+        title="Untracked files"
+        size="wide"
+        footer={<Button onClick={ignoreUntracked}>Close</Button>}
+      >
+        {rescanModal && (
+          <div className="space-y-4">
+            {rescanModal.inMods.length > 0 && (
+              <div>
+                <h4 className="font-semibold text-white mb-2">In Mods/</h4>
+                <ul className="space-y-2">
+                  {rescanModal.inMods.map((f) => (
+                    <li
+                      key={f}
+                      className="flex items-center justify-between gap-2 text-sm text-[var(--color-text)]"
                     >
-                      Apply
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+                      <span className="truncate">{f}</span>
+                      <Button size="sm" onClick={() => addUntracked(f, true)}>
+                        Add as enabled
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {rescanModal.inDisabled.length > 0 && (
+              <div>
+                <h4 className="font-semibold text-white mb-2">In Mods.disabled/</h4>
+                <ul className="space-y-2">
+                  {rescanModal.inDisabled.map((f) => (
+                    <li
+                      key={f}
+                      className="flex items-center justify-between gap-2 text-sm text-[var(--color-text)]"
+                    >
+                      <span className="truncate">{f}</span>
+                      <Button size="sm" onClick={() => addUntracked(f, false)}>
+                        Add as disabled
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <p className="text-xs text-[var(--color-text-muted)]">
+              Add tracks the file in the database. Close to ignore.
+            </p>
           </div>
+        )}
+      </Modal>
+
+      {/* Create profile modal */}
+      <Modal
+        isOpen={profileModal === "create" && createProfileDraft !== null}
+        onClose={() => {
+          setProfileModal(null);
+          setCreateProfileDraft(null);
+        }}
+        title="Create profile"
+        footer={
+          <>
+            <Button
+              onClick={() => {
+                setProfileModal(null);
+                setCreateProfileDraft(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              disabled={!createProfileDraft?.name.trim()}
+              onClick={() =>
+                createProfileDraft &&
+                handleCreateProfile(
+                  createProfileDraft.name,
+                  createProfileDraft.fromCurrent
+                )
+              }
+            >
+              Create
+            </Button>
+          </>
+        }
+      >
+        {createProfileDraft && (
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="profile-name" className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
+                Name
+              </label>
+              <Input
+                id="profile-name"
+                type="text"
+                value={createProfileDraft.name}
+                onChange={(e) =>
+                  setCreateProfileDraft((d) =>
+                    d ? { ...d, name: e.target.value } : d
+                  )
+                }
+                placeholder="Profile name"
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm text-[var(--color-text)] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={createProfileDraft.fromCurrent}
+                onChange={(e) =>
+                  setCreateProfileDraft((d) =>
+                    d ? { ...d, fromCurrent: e.target.checked } : d
+                  )
+                }
+                className="cursor-pointer"
+              />
+              Start from current enabled mod set
+            </label>
+          </div>
+        )}
+      </Modal>
+
+      {/* Rename profile modal */}
+      <Modal
+        isOpen={
+          profileModal !== null &&
+          profileModal !== "create" &&
+          "rename" in profileModal
+        }
+        onClose={() => {
+          setProfileModal(null);
+          setRenameProfileDraft("");
+        }}
+        title="Rename profile"
+        footer={
+          <>
+            <Button
+              onClick={() => {
+                setProfileModal(null);
+                setRenameProfileDraft("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              disabled={!renameProfileDraft.trim()}
+              onClick={() =>
+                profileModal &&
+                profileModal !== "create" &&
+                "rename" in profileModal &&
+                handleRenameProfile(profileModal.rename.id, renameProfileDraft)
+              }
+            >
+              Rename
+            </Button>
+          </>
+        }
+      >
+        <div>
+          <label htmlFor="rename-profile-name" className="block text-sm font-medium text-[var(--color-text)] mb-1.5">
+            Name
+          </label>
+          <Input
+            id="rename-profile-name"
+            type="text"
+            value={renameProfileDraft}
+            onChange={(e) => setRenameProfileDraft(e.target.value)}
+            placeholder="Profile name"
+          />
         </div>
-      )}
-    </section>
+      </Modal>
+
+      {/* Delete profile modal */}
+      <Modal
+        isOpen={
+          profileModal !== null &&
+          profileModal !== "create" &&
+          "delete" in profileModal
+        }
+        onClose={() => setProfileModal(null)}
+        title="Delete profile?"
+        footer={
+          <>
+            <Button onClick={() => setProfileModal(null)}>Cancel</Button>
+            <Button
+              variant="danger"
+              onClick={() =>
+                profileModal &&
+                profileModal !== "create" &&
+                "delete" in profileModal &&
+                handleDeleteProfile(profileModal.delete)
+              }
+            >
+              Delete
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[var(--color-text)]">
+          Delete profile &quot;
+          {profileModal !== null &&
+            profileModal !== "create" &&
+            "delete" in profileModal &&
+            profileModal.delete.name}
+          &quot;? This does not remove any mod files.
+        </p>
+      </Modal>
+
+      {/* Profile switch dry-run modal */}
+      <Modal
+        isOpen={switchDryRun !== null}
+        onClose={() => applyingProfile ? undefined : cancelSwitchDryRun()}
+        title={switchDryRun ? `Switch to "${switchDryRun.profile.name}"` : ""}
+        size="wide"
+        footer={
+          !switchDryRun?.progress && (
+            <>
+              <Button onClick={cancelSwitchDryRun}>Cancel</Button>
+              <Button
+                variant="primary"
+                onClick={applyProfileSwitch}
+                disabled={applyingProfile}
+                isLoading={applyingProfile}
+              >
+                Apply
+              </Button>
+            </>
+          )
+        }
+      >
+        {switchDryRun && (
+          <div className="space-y-4">
+            {switchDryRun.progress ? (
+              <div className="flex items-center gap-3">
+                <Spinner />
+                <p className="text-[var(--color-text)]">
+                  Applying… {switchDryRun.progress.done} /{" "}
+                  {switchDryRun.progress.total} files moved.
+                </p>
+              </div>
+            ) : (
+              <>
+                <p className="text-[var(--color-text)]">
+                  Summary: the following mods will be moved (no files will be
+                  deleted).
+                </p>
+                {switchDryRun.toEnable.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-white mb-2">
+                      Enable ({switchDryRun.toEnable.length})
+                    </h4>
+                    <ul className="space-y-1">
+                      {switchDryRun.toEnable.map((m) => (
+                        <li
+                          key={m.id}
+                          className="text-sm text-[var(--color-text)]"
+                        >
+                          {m.name}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {switchDryRun.toDisable.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-white mb-2">
+                      Disable ({switchDryRun.toDisable.length})
+                    </h4>
+                    <ul className="space-y-1">
+                      {switchDryRun.toDisable.map((m) => (
+                        <li
+                          key={m.id}
+                          className="text-sm text-[var(--color-text)]"
+                        >
+                          {m.name}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+      </Modal>
+    </PageContainer>
   );
 }

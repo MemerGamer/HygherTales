@@ -11,6 +11,25 @@ From repo root:
 
 Copy `apps/desktop/.env.example` to `apps/desktop/.env` and set `VITE_PROXY_BASE_URL` (e.g. `http://localhost:8787`) if you use the proxy.
 
+## UI Styling
+
+The desktop app uses **Tailwind CSS v4** with a dark glassmorphism theme.
+
+- **Styling approach:** Tailwind CSS v4 with CSS-first configuration (no `tailwind.config.js` required)
+- **Components:** Reusable UI components in `src/components/ui/` (Button, Input, Label, Card, Modal, Badge, Spinner)
+- **Layout components:** `src/components/layout/PageContainer` for consistent page structure
+- **Theme:** Dark theme variables defined in `src/styles/tailwind.css` using `@theme`
+- **Responsive:** Breakpoints at `sm: 640px`, `md: 768px`, `lg: 1024px`
+- **Accessibility:** Focus-visible states, focus trap in modals, ARIA labels, keyboard navigation
+
+### Styling conventions
+
+- Use Tailwind utility classes for layout, spacing, and styling
+- Use theme CSS variables (e.g., `var(--color-surface)`, `var(--color-text)`) for consistency
+- Components handle their own responsive behavior (e.g., button groups wrap on small screens)
+- Modal sizes: `default` (max-w-xl) and `wide` (max-w-2xl)
+- All interactive elements have visible focus states for keyboard navigation
+
 ## Hytale Mods folder detection and validation
 
 ### Goal

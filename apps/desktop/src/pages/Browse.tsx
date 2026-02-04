@@ -22,6 +22,8 @@ import {
 import { loadBrowseSource, saveBrowseSource } from "../lib/settings";
 import { openExternalUrl } from "../lib/shell";
 import type { ModSummary, ModCategory, ModDetailsResponse, ModFile } from "@hyghertales/shared";
+import { PageContainer } from "../components/layout/PageContainer";
+import { Button, Input, Card, Modal, Spinner } from "../components/ui";
 
 /** Parse description that may be Markdown, HTML, or both. Returns HTML string. */
 function parseDescriptionToHtml(description: string): string {
@@ -283,10 +285,13 @@ export function Browse({ proxyBaseUrl, modsDirPath }: BrowseProps) {
       ? `https://www.orbis.place/mod/${mod.slug}`
       : "";
 
+  const selectStyles =
+    "px-3 py-2 bg-[rgba(255,255,255,0.1)] border border-[var(--color-border)] rounded text-[var(--color-text)] transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#1a1a1a] focus:ring-[rgba(100,160,100,0.6)] disabled:opacity-60 disabled:cursor-not-allowed";
+
   return (
-    <section className="page">
-      <h2>Browse mods</h2>
-      <div className="browse-toolbar">
+    <PageContainer title="Browse mods">
+      {/* Search and filter toolbar */}
+      <div className="flex flex-wrap gap-2 mb-6">
         <select
           aria-label="Mod source"
           value={source}
@@ -296,11 +301,12 @@ export function Browse({ proxyBaseUrl, modsDirPath }: BrowseProps) {
             saveBrowseSource(next);
           }}
           disabled={loading}
+          className={selectStyles}
         >
           <option value="curseforge">CurseForge</option>
           <option value="orbis">Orbis.place</option>
         </select>
-        <input
+        <Input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -308,6 +314,7 @@ export function Browse({ proxyBaseUrl, modsDirPath }: BrowseProps) {
           placeholder={source === "orbis" ? "Search Orbis.place mods…" : "Search CurseForge mods…"}
           disabled={loading}
           aria-label="Search mods"
+          className="flex-1 min-w-[200px]"
         />
         {source === "curseforge" && (
           <>
@@ -316,6 +323,7 @@ export function Browse({ proxyBaseUrl, modsDirPath }: BrowseProps) {
               value={categoryId || ""}
               onChange={(e) => setCategoryId(Number(e.target.value) || 0)}
               disabled={loading}
+              className={selectStyles}
             >
               <option value="">All categories</option>
               {categories.map((cat) => (
@@ -329,6 +337,7 @@ export function Browse({ proxyBaseUrl, modsDirPath }: BrowseProps) {
               value={sortField}
               onChange={(e) => setSortField(Number(e.target.value))}
               disabled={loading}
+              className={selectStyles}
             >
               {SORT_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -341,6 +350,7 @@ export function Browse({ proxyBaseUrl, modsDirPath }: BrowseProps) {
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value as "asc" | "desc")}
               disabled={loading}
+              className={selectStyles}
             >
               <option value="desc">Descending</option>
               <option value="asc">Ascending</option>
@@ -355,6 +365,7 @@ export function Browse({ proxyBaseUrl, modsDirPath }: BrowseProps) {
               setOrbisSortBy(e.target.value as "date" | "downloads" | "name")
             }
             disabled={loading}
+            className={selectStyles}
           >
             {ORBIS_SORT_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -363,43 +374,67 @@ export function Browse({ proxyBaseUrl, modsDirPath }: BrowseProps) {
             ))}
           </select>
         )}
-        <button type="button" onClick={doSearch} disabled={loading}>
+        <Button onClick={doSearch} disabled={loading}>
           {loading ? "Loading…" : "Search"}
-        </button>
+        </Button>
       </div>
+
+      {/* Error banner */}
       {error && (
-        <div className="error-banner" role="alert">
+        <div
+          className="p-3 mb-6 bg-[var(--color-danger)] border border-[rgba(220,80,80,0.6)] rounded text-[#ffb3b3]"
+          role="alert"
+        >
           {error}
         </div>
       )}
+
+      {/* Results count */}
       {items.length > 0 && (
-        <p className="browse-meta">
+        <p className="mb-4 text-sm text-[var(--color-text-muted)]">
           {totalCount} result{totalCount !== 1 ? "s" : ""}
         </p>
       )}
-      <ul className="mod-list">
+
+      {/* Loading state */}
+      {loading && items.length === 0 && (
+        <div className="flex justify-center py-12">
+          <Spinner size="lg" />
+        </div>
+      )}
+
+      {/* Results grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {items.map((mod) => (
-          <li
+          <Card
             key={modKey(mod)}
-            className="mod-card mod-card-clickable"
-            role="button"
-            tabIndex={0}
+            clickable
             onClick={() => openModDetail(mod)}
             onKeyDown={(e) => e.key === "Enter" && openModDetail(mod)}
+            className="flex gap-3"
           >
             {mod.logoUrl && (
-              <img src={mod.logoUrl} alt="" className="mod-logo" />
+              <img
+                src={mod.logoUrl}
+                alt=""
+                className="w-12 h-12 rounded object-cover flex-shrink-0"
+              />
             )}
-            <div className="mod-info">
-              <strong>{mod.name}</strong>
-              {mod.summary && <p>{mod.summary}</p>}
-              <span className="mod-meta">
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-white mb-1">{mod.name}</h3>
+              {mod.summary && (
+                <p className="text-sm text-[var(--color-text-muted)] line-clamp-2 mb-2">
+                  {mod.summary}
+                </p>
+              )}
+              <div className="text-xs text-[var(--color-text-muted)]">
                 {mod.provider} · {mod.slug}
                 {mod.provider === "orbis" && orbisModUrl(mod) && (
-                  <> ·{" "}
+                  <>
+                    {" · "}
                     <button
                       type="button"
-                      className="link-button"
+                      className="text-[#7eb8ff] hover:text-[#a8d4ff] underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[rgba(100,160,100,0.6)]"
                       onClick={(e) => {
                         e.stopPropagation();
                         openExternalUrl(orbisModUrl(mod));
@@ -409,92 +444,103 @@ export function Browse({ proxyBaseUrl, modsDirPath }: BrowseProps) {
                     </button>
                   </>
                 )}
-              </span>
+              </div>
             </div>
-          </li>
+          </Card>
         ))}
-      </ul>
+      </div>
 
-      {selectedMod && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="mod-detail-title">
-          <div className="modal">
-            <div className="modal-header">
-              <h3 id="mod-detail-title">{selectedMod.name}</h3>
-              <button type="button" className="modal-close" onClick={closeModDetail} aria-label="Close">
-                ×
-              </button>
-            </div>
-            <div className="modal-body">
-              {detailLoading && <p>Loading…</p>}
-              {detailError && (
-                <div className="error-banner" role="alert">
-                  {detailError}
+      {/* Mod detail modal */}
+      <Modal
+        isOpen={selectedMod !== null}
+        onClose={closeModDetail}
+        title={selectedMod?.name}
+        size="wide"
+      >
+        {detailLoading && (
+          <div className="flex justify-center py-8">
+            <Spinner size="lg" />
+          </div>
+        )}
+        {detailError && (
+          <div
+            className="p-3 bg-[var(--color-danger)] border border-[rgba(220,80,80,0.6)] rounded text-[#ffb3b3] mb-4"
+            role="alert"
+          >
+            {detailError}
+          </div>
+        )}
+        {detail && !detailLoading && (
+          <div className="space-y-6">
+            {detail.logoUrl && (
+              <img
+                src={detail.logoUrl}
+                alt={detail.name}
+                className="w-24 h-24 rounded object-cover"
+              />
+            )}
+            {detail.description && (
+              <div
+                className="prose prose-invert prose-sm max-w-none overflow-y-auto max-h-[40vh] text-[var(--color-text)] [&_a]:text-[#7eb8ff] [&_a:hover]:text-[#a8d4ff] [&_strong]:text-white [&_h1]:text-white [&_h2]:text-white [&_h3]:text-white [&_h4]:text-white [&_code]:bg-black/30 [&_code]:px-1 [&_code]:rounded [&_pre]:bg-black/30 [&_pre]:p-3 [&_blockquote]:border-l-white/30"
+                dangerouslySetInnerHTML={{
+                  __html: parseDescriptionToHtml(detail.description),
+                }}
+              />
+            )}
+            <div className="space-y-3">
+              <h4 className="font-semibold text-white">Files / versions</h4>
+              {detailFiles.length === 0 ? (
+                <p className="text-sm text-[var(--color-text-muted)]">No files available.</p>
+              ) : (
+                <div className="space-y-2 max-h-[35vh] overflow-y-auto pr-1">
+                  {detailFiles.map((file, i) => {
+                    const key =
+                      selectedMod?.provider === "curseforge"
+                        ? `cf-${file.fileId ?? i}`
+                        : `orbis-${file.versionId ?? ""}-${file.fileIndex ?? i}`;
+                    const isDownloading = downloadingFile === key;
+                    return (
+                      <div
+                        key={key}
+                        className="flex flex-wrap items-center gap-2 p-3 bg-[rgba(255,255,255,0.05)] rounded"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-white truncate">
+                            {file.displayName || file.fileName || `File ${i + 1}`}
+                          </div>
+                          <div className="text-xs text-[var(--color-text-muted)]">
+                            {file.releaseType && `${file.releaseType} · `}
+                            {file.fileDate ? new Date(file.fileDate).toLocaleDateString() : ""}
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          disabled={isDownloading}
+                          onClick={() => handleDownloadFile(file)}
+                          isLoading={isDownloading}
+                        >
+                          Download
+                        </Button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
-              {detail && !detailLoading && (
-                <>
-                  {detail.logoUrl && (
-                    <img src={detail.logoUrl} alt="" className="mod-detail-logo" />
-                  )}
-                  {detail.description && (
-                    <div
-                      className="mod-detail-description mod-detail-description-html"
-                      dangerouslySetInnerHTML={{
-                        __html: parseDescriptionToHtml(detail.description),
-                      }}
-                    />
-                  )}
-                  <div className="mod-file-list-wrapper">
-                    <h4>Files / versions</h4>
-                    {detailFiles.length === 0 ? (
-                      <p>No files available.</p>
-                    ) : (
-                      <ul className="mod-file-list">
-                        {detailFiles.map((file, i) => {
-                          const key =
-                            selectedMod.provider === "curseforge"
-                              ? `cf-${file.fileId ?? i}`
-                              : `orbis-${file.versionId ?? ""}-${file.fileIndex ?? i}`;
-                          const isDownloading = downloadingFile === key;
-                          return (
-                            <li key={key} className="mod-file-item">
-                              <span className="mod-file-name">
-                                {file.displayName || file.fileName || `File ${i + 1}`}
-                              </span>
-                              <span className="mod-file-meta">
-                                {file.releaseType && `${file.releaseType} · `}
-                                {file.fileDate ? new Date(file.fileDate).toLocaleDateString() : ""}
-                              </span>
-                              <button
-                                type="button"
-                                disabled={isDownloading}
-                                onClick={() => handleDownloadFile(file)}
-                              >
-                                {isDownloading ? "…" : "Download"}
-                              </button>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </div>
-                  {selectedMod.provider === "orbis" && orbisModUrl(selectedMod) && (
-                    <p className="mod-detail-link">
-                      <button
-                        type="button"
-                        className="link-button"
-                        onClick={() => openExternalUrl(orbisModUrl(selectedMod))}
-                      >
-                        Open on Orbis.place
-                      </button>
-                    </p>
-                  )}
-                </>
-              )}
             </div>
+            {selectedMod?.provider === "orbis" && orbisModUrl(selectedMod) && (
+              <div className="pt-4 border-t border-[var(--color-border)]">
+                <button
+                  type="button"
+                  className="text-sm text-[#7eb8ff] hover:text-[#a8d4ff] underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(100,160,100,0.6)]"
+                  onClick={() => selectedMod && openExternalUrl(orbisModUrl(selectedMod))}
+                >
+                  Open on Orbis.place
+                </button>
+              </div>
+            )}
           </div>
-        </div>
-      )}
-    </section>
+        )}
+      </Modal>
+    </PageContainer>
   );
 }

@@ -3,6 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import type { Settings } from "../lib/settings";
 import { loadSettings, saveSettings } from "../lib/settings";
+import { PageContainer } from "../components/layout/PageContainer";
+import { Button, Input, Label } from "../components/ui";
 
 interface SettingsPageProps {
   onSettingsChange?: (settings: Settings) => void;
@@ -119,13 +121,30 @@ export function SettingsPage({ onSettingsChange }: SettingsPageProps) {
     }
   }
 
+  const getStatusColor = (status: PathStatus) => {
+    switch (status) {
+      case "ok":
+      case "created":
+        return "text-[#7ed67e]";
+      case "error":
+      case "not-dir":
+      case "not-writable":
+        return "text-[#ffb3b3]";
+      case "missing":
+        return "text-[#f59e0b]";
+      default:
+        return "text-[var(--color-text-muted)]";
+    }
+  };
+
   return (
-    <section className="page">
-      <h2>Settings</h2>
-      <div className="settings-form">
-        <label>
-          <span>Proxy base URL</span>
-          <input
+    <PageContainer title="Settings">
+      <div className="space-y-6">
+        {/* Proxy URL */}
+        <div>
+          <Label htmlFor="proxy-url">Proxy base URL</Label>
+          <Input
+            id="proxy-url"
             type="url"
             value={settings.proxyBaseUrl}
             onChange={(e) =>
@@ -133,10 +152,13 @@ export function SettingsPage({ onSettingsChange }: SettingsPageProps) {
             }
             placeholder="http://localhost:8787"
           />
-        </label>
-        <label>
-          <span>Hytale user data path (optional)</span>
-          <input
+        </div>
+
+        {/* Hytale user data path */}
+        <div>
+          <Label htmlFor="userdata-path">Hytale user data path (optional)</Label>
+          <Input
+            id="userdata-path"
             type="text"
             value={settings.hytaleUserDataPath ?? ""}
             onChange={(e) =>
@@ -147,11 +169,14 @@ export function SettingsPage({ onSettingsChange }: SettingsPageProps) {
             }
             placeholder="Override path to game user data"
           />
-        </label>
-        <label>
-          <span>Mods directory path</span>
-          <div className="mods-dir-row">
-            <input
+        </div>
+
+        {/* Mods directory */}
+        <div>
+          <Label htmlFor="mods-dir">Mods directory path</Label>
+          <div className="flex gap-2">
+            <Input
+              id="mods-dir"
               type="text"
               value={settings.modsDirPath ?? ""}
               onChange={(e) => {
@@ -162,28 +187,29 @@ export function SettingsPage({ onSettingsChange }: SettingsPageProps) {
                 setPathStatus("idle");
               }}
               placeholder="Path where mods are stored"
+              className="flex-1"
             />
-            <div className="mods-dir-buttons">
-              <button type="button" onClick={handleAutoDetect}>
-                Auto-detect
-              </button>
-              <button type="button" onClick={handleBrowse}>
-                Browse…
-              </button>
-              <button type="button" onClick={handleValidate}>
-                Validate
-              </button>
-            </div>
+          </div>
+          <div className="flex gap-2 mt-2">
+            <Button size="sm" onClick={handleAutoDetect}>
+              Auto-detect
+            </Button>
+            <Button size="sm" onClick={handleBrowse}>
+              Browse…
+            </Button>
+            <Button size="sm" onClick={handleValidate}>
+              Validate
+            </Button>
           </div>
           {candidates.length > 0 && (
-            <div className="candidates-list">
-              <span>Pick a path:</span>
-              <ul>
+            <div className="mt-3 p-3 bg-[rgba(255,255,255,0.05)] border border-[var(--color-border)] rounded">
+              <p className="text-sm text-[var(--color-text)] mb-2">Pick a path:</p>
+              <ul className="space-y-1">
                 {candidates.map((p) => (
                   <li key={p}>
                     <button
                       type="button"
-                      className="candidate-link"
+                      className="text-sm text-[#7eb8ff] hover:text-[#a8d4ff] underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(100,160,100,0.6)]"
                       onClick={() => selectCandidate(p)}
                     >
                       {p}
@@ -195,18 +221,21 @@ export function SettingsPage({ onSettingsChange }: SettingsPageProps) {
           )}
           {pathMessage && (
             <p
-              className={`path-status path-status--${pathStatus}`}
+              className={`mt-2 text-sm ${getStatusColor(pathStatus)}`}
               role="status"
               aria-live="polite"
             >
               {pathMessage}
             </p>
           )}
-        </label>
-        <label>
-          <span>Hytale executable (optional, for Launch)</span>
-          <div className="mods-dir-row">
-            <input
+        </div>
+
+        {/* Game executable */}
+        <div>
+          <Label htmlFor="game-exe">Hytale executable (optional, for Launch)</Label>
+          <div className="flex gap-2">
+            <Input
+              id="game-exe"
               type="text"
               value={settings.gameExePath ?? ""}
               onChange={(e) =>
@@ -216,15 +245,14 @@ export function SettingsPage({ onSettingsChange }: SettingsPageProps) {
                 }))
               }
               placeholder="Path to Hytale.exe (or game launcher)"
+              className="flex-1"
             />
-            <div className="mods-dir-buttons">
-              <button type="button" onClick={handleBrowseGameExe}>
-                Browse…
-              </button>
-            </div>
+            <Button size="sm" onClick={handleBrowseGameExe}>
+              Browse…
+            </Button>
           </div>
-        </label>
+        </div>
       </div>
-    </section>
+    </PageContainer>
   );
 }

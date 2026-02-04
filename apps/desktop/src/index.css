@@ -1,6 +1,6 @@
-:root {
-  font-family: system-ui, -apple-system, sans-serif;
-  line-height: 1.5;
+/* Base reset - Tailwind handles the rest */
+* {
+  box-sizing: border-box;
 }
 
 body {
@@ -9,4 +9,17 @@ body {
 
 #root {
   min-height: 100vh;
+}
+
+/* Utility for screen readers */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
