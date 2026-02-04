@@ -59,6 +59,21 @@ export function SettingsPage({ onSettingsChange }: SettingsPageProps) {
     }
   }
 
+  async function handleBrowseGameExe() {
+    try {
+      const selected = await open({
+        directory: false,
+        multiple: false,
+        title: "Select Hytale executable",
+      });
+      if (selected) {
+        setSettings((s) => ({ ...s, gameExePath: selected }));
+      }
+    } catch (e) {
+      setPathMessage(String(e));
+    }
+  }
+
   async function handleValidate() {
     const path = settings.modsDirPath?.trim();
     setPathMessage("");
@@ -187,6 +202,27 @@ export function SettingsPage({ onSettingsChange }: SettingsPageProps) {
               {pathMessage}
             </p>
           )}
+        </label>
+        <label>
+          <span>Hytale executable (optional, for Launch)</span>
+          <div className="mods-dir-row">
+            <input
+              type="text"
+              value={settings.gameExePath ?? ""}
+              onChange={(e) =>
+                setSettings((s) => ({
+                  ...s,
+                  gameExePath: e.target.value.trim() || null,
+                }))
+              }
+              placeholder="Path to Hytale.exe (or game launcher)"
+            />
+            <div className="mods-dir-buttons">
+              <button type="button" onClick={handleBrowseGameExe}>
+                Browse…
+              </button>
+            </div>
+          </div>
         </label>
       </div>
     </section>

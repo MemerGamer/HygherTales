@@ -19,6 +19,11 @@ struct CheckPathAccessResult {
     writable: bool,
 }
 
+#[derive(serde::Serialize)]
+struct LaunchGameResult {
+    ok: bool,
+}
+
 /// Installed mod record (matches TS InstalledMod schema).
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -402,6 +407,27 @@ fn read_text_file(path: String) -> Result<String, String> {
     fs::read_to_string(&p).map_err(|e| e.to_string())
 }
 
+/// Launch the game executable. No auth, no game file downloads. Validates path exists and is a file.
+#[tauri::command]
+fn launch_game(exe_path: String, args: Option<Vec<String>>) -> Result<LaunchGameResult, String> {
+    let path = PathBuf::from(exe_path.trim());
+    if path.as_os_str().is_empty() {
+        return Err("Path is empty".to_string());
+    }
+    if !path.exists() {
+        return Err("Path does not exist".to_string());
+    }
+    if path.is_dir() {
+        return Err("Path is a directory, not an executable".to_string());
+    }
+    let args = args.unwrap_or_default();
+    Command::new(&path)
+        .args(args)
+        .spawn()
+        .map_err(|e| format!("Failed to launch: {e}"))?;
+    Ok(LaunchGameResult { ok: true })
+}
+
 /// Open a path (file or folder) in the system file manager. Does not use the shell plugin
 /// so file:// URLs are not needed; the shell plugin only allows http/https/mailto/tel.
 #[tauri::command]
@@ -464,6 +490,7 @@ pub fn run() {
             apply_mod_update,
             write_text_file,
             read_text_file,
+            launch_game,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

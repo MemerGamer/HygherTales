@@ -91,6 +91,36 @@
   line-height: 1.5;
 }
 
+/* Home launch */
+.home-launch {
+  margin-top: 1.25rem;
+}
+
+.home-launch-btn {
+  padding: 0.6rem 1.25rem;
+  font-size: 1rem;
+  background: rgba(100, 160, 100, 0.4);
+  border: 1px solid rgba(120, 200, 120, 0.5);
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+}
+
+.home-launch-btn:hover:not(:disabled) {
+  background: rgba(100, 160, 100, 0.55);
+}
+
+.home-launch-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.home-launch-hint {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.65);
+}
+
 /* Settings */
 .settings-form {
   display: flex;

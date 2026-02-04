@@ -15,12 +15,14 @@ export interface Settings {
   proxyBaseUrl: string;
   hytaleUserDataPath: string | null;
   modsDirPath: string | null;
+  gameExePath: string | null;
 }
 
 const defaults: Settings = {
   proxyBaseUrl: defaultProxyBaseUrl,
   hytaleUserDataPath: null,
   modsDirPath: null,
+  gameExePath: null,
 };
 
 export function loadSettings(): Settings {
@@ -41,6 +43,10 @@ export function loadSettings(): Settings {
       modsDirPath:
         typeof parsed.modsDirPath === "string" && parsed.modsDirPath.trim()
           ? parsed.modsDirPath.trim()
+          : null,
+      gameExePath:
+        typeof parsed.gameExePath === "string" && parsed.gameExePath.trim()
+          ? parsed.gameExePath.trim()
           : null,
     };
   } catch {

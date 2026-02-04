@@ -42,7 +42,7 @@ function App() {
         </nav>
       </header>
       <main className="app-main">
-        {page === "home" && <Home />}
+        {page === "home" && <Home gameExePath={settings.gameExePath} />}
         {page === "browse" && (
           <Browse
             proxyBaseUrl={settings.proxyBaseUrl}
