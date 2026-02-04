@@ -1,7 +1,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::path::PathBuf;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::{env, fs};
+use tauri::Manager;
 
 #[derive(serde::Serialize)]
 struct EnsureModsDirResult {
@@ -16,18 +19,179 @@ struct CheckPathAccessResult {
     writable: bool,
 }
 
+/// Installed mod record (matches TS InstalledMod schema).
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct InstalledModRecord {
+    pub id: Option<i64>,
+    pub provider: String,
+    pub project_id: Option<i64>,
+    pub resource_id: Option<String>,
+    pub slug: String,
+    pub name: String,
+    pub installed_file_id: Option<serde_json::Value>,
+    pub installed_filename: String,
+    pub installed_at: String,
+    pub source_url: Option<String>,
+    pub enabled: bool,
+}
+
+const INSTALLED_MODS_FILENAME: &str = "installed_mods.json";
+
+fn app_installed_mods_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("{e}"))?;
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir.join(INSTALLED_MODS_FILENAME))
+}
+
+#[tauri::command]
+fn read_installed_mods(app: tauri::AppHandle) -> Result<Vec<InstalledModRecord>, String> {
+    let path = app_installed_mods_path(&app)?;
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let data = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let mods: Vec<InstalledModRecord> = serde_json::from_str(&data).map_err(|e| e.to_string())?;
+    Ok(mods)
+}
+
+#[tauri::command]
+fn write_installed_mods(app: tauri::AppHandle, mods: Vec<InstalledModRecord>) -> Result<(), String> {
+    let path = app_installed_mods_path(&app)?;
+    let data = serde_json::to_string_pretty(&mods).map_err(|e| e.to_string())?;
+    fs::write(&path, data).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Ensures Mods.disabled exists (sibling of the given Mods dir).
+#[tauri::command]
+fn ensure_mods_disabled_dir(mods_dir: String) -> Result<EnsureModsDirResult, String> {
+    let mods_path = PathBuf::from(mods_dir.trim());
+    if mods_path.as_os_str().is_empty() {
+        return Err("Mods path is empty".to_string());
+    }
+    let disabled_path = mods_path.with_extension("disabled");
+    if disabled_path.exists() {
+        if !disabled_path.is_dir() {
+            return Err("Mods.disabled exists but is not a directory".to_string());
+        }
+        return Ok(EnsureModsDirResult { ok: true, created: false });
+    }
+    fs::create_dir_all(&disabled_path).map_err(|e| e.to_string())?;
+    Ok(EnsureModsDirResult { ok: true, created: true })
+}
+
+/// Returns a path that doesn't exist yet; if `target` exists, appends (1), (2), etc.
+fn unique_file_path(target: &Path) -> PathBuf {
+    if !target.exists() {
+        return target.to_path_buf();
+    }
+    let stem = target.file_stem().and_then(|s| s.to_str()).unwrap_or("file");
+    let ext = target.extension().and_then(|e| e.to_str());
+    let parent = target.parent().unwrap_or(Path::new("."));
+    for n in 1..1000 {
+        let name = if let Some(ext) = ext {
+            format!("{stem} ({n}).{ext}")
+        } else {
+            format!("{stem} ({n})")
+        };
+        let p = parent.join(name);
+        if !p.exists() {
+            return p;
+        }
+    }
+    target.to_path_buf()
+}
+
+/// Move a file from one path to another. If destination exists, use a unique name.
+/// Returns the final path where the file was moved (for DB update).
+#[tauri::command]
+fn move_mod_file(from_path: String, to_path: String) -> Result<String, String> {
+    let from = PathBuf::from(from_path.trim());
+    let to = PathBuf::from(to_path.trim());
+    if !from.exists() {
+        return Err("Source file does not exist".to_string());
+    }
+    if from.is_dir() {
+        return Err("Source is a directory".to_string());
+    }
+    if let Some(p) = to.parent() {
+        fs::create_dir_all(p).map_err(|e| e.to_string())?;
+    }
+    let final_to = unique_file_path(&to);
+    fs::rename(&from, &final_to).map_err(|e| e.to_string())?;
+    Ok(final_to.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+fn move_file_to_trash(path: String) -> Result<(), String> {
+    let p = PathBuf::from(path.trim());
+    if !p.exists() {
+        return Err("File does not exist".to_string());
+    }
+    trash::delete(&p).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn list_mod_dir_file_names(dir_path: String) -> Result<Vec<String>, String> {
+    let dir = PathBuf::from(dir_path.trim());
+    if !dir.is_dir() {
+        return Err("Path is not a directory".to_string());
+    }
+    let mut names = Vec::new();
+    for e in fs::read_dir(&dir).map_err(|e| e.to_string())? {
+        let e = e.map_err(|e| e.to_string())?;
+        if e.path().is_file() {
+            if let Some(name) = e.file_name().to_str() {
+                names.push(name.to_string());
+            }
+        }
+    }
+    names.sort();
+    Ok(names)
+}
+
+/// Download URL to destination path. Creates parent dirs. Writes to temp then renames.
+#[tauri::command]
+fn download_file_to_path(url: String, dest_path: String) -> Result<String, String> {
+    let url = url.trim();
+    let dest = PathBuf::from(dest_path.trim());
+    if url.is_empty() {
+        return Err("URL is empty".to_string());
+    }
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let client = reqwest::blocking::Client::builder()
+        .redirect(reqwest::redirect::Policy::limited(10))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let resp = client.get(url).send().map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("Download failed: HTTP {}", resp.status()));
+    }
+    let bytes = resp.bytes().map_err(|e| e.to_string())?;
+    let temp_path = dest.with_extension("tmp");
+    {
+        let mut f = fs::File::create(&temp_path).map_err(|e| e.to_string())?;
+        f.write_all(&bytes).map_err(|e| e.to_string())?;
+    }
+    let final_path = unique_file_path(&dest);
+    fs::rename(&temp_path, &final_path).map_err(|e| e.to_string())?;
+    Ok(final_path.to_string_lossy().into_owned())
+}
+
 /// Returns candidate paths for the default Hytale Mods folder per platform.
-///
-/// - Windows: %APPDATA%\Hytale\UserData\Mods
-/// - macOS: ~/Library/Application Support/Hytale/UserData/Mods
-/// - Linux: Official Flatpak uses com.hypixel.HytaleLauncher → ~/.var/app/com.hypixel.HytaleLauncher/data/Hytale/UserData/Mods; one XDG fallback for native/AUR.
 #[tauri::command]
 fn get_default_hytale_mods_paths() -> Vec<String> {
     let mut candidates: Vec<String> = Vec::new();
 
     #[cfg(target_os = "windows")]
     {
-        // %APPDATA%\Hytale\UserData\Mods (e.g. C:\Users\<user>\AppData\Roaming\Hytale\UserData\Mods)
         if let Some(appdata) = env::var_os("APPDATA") {
             let path = PathBuf::from(appdata).join("Hytale").join("UserData").join("Mods");
             candidates.push(path.to_string_lossy().into_owned());
@@ -36,7 +200,6 @@ fn get_default_hytale_mods_paths() -> Vec<String> {
 
     #[cfg(target_os = "macos")]
     {
-        // ~/Library/Application Support/Hytale/UserData/Mods
         if let Some(home) = env::var_os("HOME") {
             let path = PathBuf::from(home)
                 .join("Library")
@@ -50,7 +213,6 @@ fn get_default_hytale_mods_paths() -> Vec<String> {
 
     #[cfg(target_os = "linux")]
     {
-        // Official Linux build: Flatpak app id com.hypixel.HytaleLauncher
         if let Some(home) = env::var_os("HOME") {
             let path = PathBuf::from(home)
                 .join(".var")
@@ -62,7 +224,6 @@ fn get_default_hytale_mods_paths() -> Vec<String> {
                 .join("Mods");
             candidates.push(path.to_string_lossy().into_owned());
         }
-        // Fallback for native/AUR installs
         if let Some(xdg) = env::var_os("XDG_DATA_HOME") {
             let path = PathBuf::from(xdg).join("Hytale").join("UserData").join("Mods");
             let s = path.to_string_lossy().into_owned();
@@ -87,8 +248,6 @@ fn get_default_hytale_mods_paths() -> Vec<String> {
     candidates
 }
 
-/// Ensures the Mods directory exists. Creates it (and parents) if missing.
-/// Does not delete or modify any existing files.
 #[tauri::command]
 fn ensure_mods_dir(path: String) -> Result<EnsureModsDirResult, String> {
     let p = PathBuf::from(path.trim());
@@ -105,7 +264,6 @@ fn ensure_mods_dir(path: String) -> Result<EnsureModsDirResult, String> {
     Ok(EnsureModsDirResult { ok: true, created: true })
 }
 
-/// Checks path existence, whether it is a directory, and if it is writable.
 #[tauri::command]
 fn check_path_access(path: String) -> CheckPathAccessResult {
     let p = PathBuf::from(path.trim());
@@ -131,6 +289,47 @@ fn check_writable(path: &std::path::Path) -> bool {
     }
 }
 
+/// Open a path (file or folder) in the system file manager. Does not use the shell plugin
+/// so file:// URLs are not needed; the shell plugin only allows http/https/mailto/tel.
+#[tauri::command]
+fn open_path_in_file_manager(path: String) -> Result<(), String> {
+    let path = path.trim();
+    if path.is_empty() {
+        return Err("Path is empty".to_string());
+    }
+    let p = PathBuf::from(path);
+    if !p.exists() {
+        return Err("Path does not exist".to_string());
+    }
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("explorer")
+            .arg(p.as_os_str())
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg(&p)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        Command::new("xdg-open")
+            .arg(&p)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    {
+        let _ = p;
+        return Err("Opening path in file manager is not supported on this platform".to_string());
+    }
+    Ok(())
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -139,6 +338,14 @@ pub fn run() {
             get_default_hytale_mods_paths,
             ensure_mods_dir,
             check_path_access,
+            read_installed_mods,
+            write_installed_mods,
+            ensure_mods_disabled_dir,
+            move_mod_file,
+            move_file_to_trash,
+            list_mod_dir_file_names,
+            download_file_to_path,
+            open_path_in_file_manager,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

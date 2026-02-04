@@ -43,8 +43,13 @@ function App() {
       </header>
       <main className="app-main">
         {page === "home" && <Home />}
-        {page === "browse" && <Browse proxyBaseUrl={settings.proxyBaseUrl} />}
-        {page === "installed" && <Installed />}
+        {page === "browse" && (
+          <Browse
+            proxyBaseUrl={settings.proxyBaseUrl}
+            modsDirPath={settings.modsDirPath}
+          />
+        )}
+        {page === "installed" && <Installed modsDirPath={settings.modsDirPath} />}
         {page === "settings" && (
           <SettingsPage onSettingsChange={handleSettingsChange} />
         )}

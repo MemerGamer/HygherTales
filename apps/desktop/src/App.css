@@ -494,3 +494,145 @@
   margin: 1rem 0 0;
   font-size: 0.9rem;
 }
+
+/* Installed mods page */
+.installed-toolbar {
+  margin-bottom: 1rem;
+}
+
+.installed-toolbar button {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+}
+
+.installed-toolbar button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.installed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.installed-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+}
+
+.installed-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.installed-info strong {
+  display: block;
+  color: #fff;
+  margin-bottom: 0.2rem;
+}
+
+.installed-meta {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.installed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.installed-actions button {
+  padding: 0.35rem 0.6rem;
+  font-size: 0.85rem;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: #eee;
+  cursor: pointer;
+}
+
+.installed-actions button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.installed-remove {
+  color: #f88 !important;
+}
+
+.installed-remove:hover {
+  background: rgba(200, 60, 60, 0.3) !important;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.modal-actions button {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+}
+
+.danger-button {
+  background: rgba(200, 60, 60, 0.4) !important;
+  border-color: rgba(220, 80, 80, 0.6) !important;
+}
+
+.danger-button:hover {
+  background: rgba(200, 60, 60, 0.6) !important;
+}
+
+.modal-wide {
+  max-width: 42rem;
+}
+
+.rescan-list {
+  list-style: none;
+  margin: 0 0 0.75rem;
+  padding: 0;
+}
+
+.rescan-list li {
+  margin-bottom: 0.35rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.rescan-list button {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.85rem;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+}
+
+.rescan-hint {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 0.75rem;
+}

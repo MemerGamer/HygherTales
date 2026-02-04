@@ -12,7 +12,15 @@ import {
   ApiError,
 } from "../lib/api";
 import { marked } from "marked";
+import {
+  readInstalledMods,
+  writeInstalledMods,
+  downloadFileToPath,
+  nextId,
+  type InstalledModRecord,
+} from "../lib/modsDb";
 import { loadBrowseSource, saveBrowseSource } from "../lib/settings";
+import { openExternalUrl } from "../lib/shell";
 import type { ModSummary, ModCategory, ModDetailsResponse, ModFile } from "@hyghertales/shared";
 
 /** Parse description that may be Markdown, HTML, or both. Returns HTML string. */
@@ -24,16 +32,6 @@ function parseDescriptionToHtml(description: string): string {
     }) as string;
   } catch {
     return description;
-  }
-}
-
-/** Open URL in system browser (Tauri) or new tab (web). */
-async function openExternalUrl(url: string): Promise<void> {
-  try {
-    const { open } = await import("@tauri-apps/plugin-shell");
-    await open(url);
-  } catch {
-    window.open(url, "_blank", "noopener,noreferrer");
   }
 }
 
@@ -56,9 +54,10 @@ const ORBIS_SORT_OPTIONS: { value: "date" | "downloads" | "name"; label: string 
 
 interface BrowseProps {
   proxyBaseUrl: string;
+  modsDirPath: string | null;
 }
 
-export function Browse({ proxyBaseUrl }: BrowseProps) {
+export function Browse({ proxyBaseUrl, modsDirPath }: BrowseProps) {
   const [source, setSource] = useState<ModSource>(loadBrowseSource);
   const [query, setQuery] = useState("");
   const [categoryId, setCategoryId] = useState<number>(0);
@@ -232,7 +231,42 @@ export function Browse({ proxyBaseUrl }: BrowseProps) {
         } else {
           throw new Error("Cannot get download URL for this file");
         }
-        await openExternalUrl(url);
+
+        if (modsDirPath?.trim()) {
+          const { invoke } = await import("@tauri-apps/api/core");
+          await invoke("ensure_mods_dir", { path: modsDirPath.trim() });
+          const baseDir = modsDirPath.trim().replace(/\\/g, "/").replace(/\/$/, "");
+          const fileName = file.fileName || file.displayName || "mod.jar";
+          const destPath = `${baseDir}/${fileName}`;
+          const finalPath = await downloadFileToPath(url, destPath);
+          const installedFilename = finalPath.replace(/^.*[/\\]/, "");
+          const existing = await readInstalledMods();
+          const newRecord: InstalledModRecord = {
+            id: nextId(existing),
+            provider: detail.provider,
+            projectId: detail.provider === "curseforge" ? detail.projectId : null,
+            resourceId: detail.provider === "orbis" ? detail.resourceId : null,
+            slug: detail.slug,
+            name: detail.name,
+            installedFileId:
+              detail.provider === "curseforge"
+                ? file.fileId ?? null
+                : file.versionId != null && file.fileIndex != null
+                  ? `${file.versionId}:${file.fileIndex}`
+                  : null,
+            installedFilename,
+            installedAt: new Date().toISOString(),
+            sourceUrl:
+              detail.provider === "orbis"
+                ? `https://www.orbis.place/mod/${detail.slug}`
+                : `https://www.curseforge.com/hytale/mods/${detail.slug}`,
+            enabled: true,
+          };
+          await writeInstalledMods([...existing, newRecord]);
+          setDetailError(null);
+        } else {
+          await openExternalUrl(url);
+        }
       } catch (e) {
         setDetailError(
           e instanceof ApiError ? e.body?.message ?? e.message : "Download failed"
@@ -241,7 +275,7 @@ export function Browse({ proxyBaseUrl }: BrowseProps) {
         setDownloadingFile(null);
       }
     },
-    [proxyBaseUrl, selectedMod, detail]
+    [proxyBaseUrl, selectedMod, detail, modsDirPath]
   );
 
   const orbisModUrl = (mod: ModSummary) =>
