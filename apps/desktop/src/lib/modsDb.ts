@@ -83,3 +83,13 @@ export function nextId(mods: InstalledModRecord[]): number {
     .filter((id): id is number => typeof id === "number");
   return ids.length > 0 ? Math.max(...ids) + 1 : 1;
 }
+
+/** Write UTF-8 text to a file (e.g. export profile JSON). */
+export async function writeTextFile(path: string, content: string): Promise<void> {
+  return invoke("write_text_file", { path, content });
+}
+
+/** Read file as UTF-8 text (e.g. import profile JSON). */
+export async function readTextFile(path: string): Promise<string> {
+  return invoke<string>("read_text_file", { path });
+}

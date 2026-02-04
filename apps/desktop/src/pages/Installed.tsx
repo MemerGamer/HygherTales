@@ -9,9 +9,22 @@ import {
   downloadFileToPath,
   applyModUpdate,
   nextId,
+  writeTextFile,
+  readTextFile,
   type InstalledModRecord,
 } from "../lib/modsDb";
+import {
+  readProfiles,
+  writeProfiles,
+  createProfile,
+  addProfile,
+  deleteProfile as deleteProfileFromData,
+  renameProfile as renameProfileInData,
+  type ProfileRecord,
+  type ProfilesData,
+} from "../lib/profilesDb";
 import { openPath } from "../lib/shell";
+import { open as openFileDialog, save as saveFileDialog } from "@tauri-apps/plugin-dialog";
 import { getModFiles, getDownloadUrlCurseForge, getDownloadUrlOrbis, ApiError } from "../lib/api";
 import { getLatestFile, isUpdateAvailable } from "../lib/updates";
 import type { ModFile } from "@hyghertales/shared";
@@ -39,6 +52,24 @@ function updateKey(mod: InstalledModRecord): string {
   return mod.id != null ? String(mod.id) : `${mod.provider}-${mod.slug}`;
 }
 
+/** Export format: list of mod identifiers for import. */
+interface ExportedProfileMod {
+  provider: "curseforge" | "orbis";
+  projectId?: number;
+  resourceId?: string;
+  fileId?: number;
+  versionId?: string;
+  fileIndex?: number;
+  slug: string;
+  name: string;
+}
+
+interface ExportedProfile {
+  name: string;
+  exportedAt: string;
+  mods: ExportedProfileMod[];
+}
+
 export function Installed({ modsDirPath, proxyBaseUrl }: InstalledProps) {
   const [mods, setMods] = useState<InstalledModRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,6 +84,23 @@ export function Installed({ modsDirPath, proxyBaseUrl }: InstalledProps) {
   const [checkingUpdates, setCheckingUpdates] = useState(false);
   const [updatingIds, setUpdatingIds] = useState<Set<number>>(new Set());
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [profilesData, setProfilesData] = useState<ProfilesData | null>(null);
+  const [profileModal, setProfileModal] = useState<
+    "create" | { rename: ProfileRecord } | { delete: ProfileRecord } | null
+  >(null);
+  const [switchDryRun, setSwitchDryRun] = useState<{
+    profile: ProfileRecord;
+    toEnable: InstalledModRecord[];
+    toDisable: InstalledModRecord[];
+    progress?: { done: number; total: number };
+  } | null>(null);
+  const [applyingProfile, setApplyingProfile] = useState(false);
+  const [exportImportError, setExportImportError] = useState<string | null>(null);
+  const [createProfileDraft, setCreateProfileDraft] = useState<{
+    name: string;
+    fromCurrent: boolean;
+  } | null>(null);
+  const [renameProfileDraft, setRenameProfileDraft] = useState<string>("");
 
   const loadMods = useCallback(async () => {
     setLoading(true);
@@ -68,9 +116,22 @@ export function Installed({ modsDirPath, proxyBaseUrl }: InstalledProps) {
     }
   }, []);
 
+  const loadProfiles = useCallback(async () => {
+    try {
+      const data = await readProfiles();
+      setProfilesData(data);
+    } catch {
+      setProfilesData({ nextId: 1, activeProfileId: null, profiles: [] });
+    }
+  }, []);
+
   useEffect(() => {
     loadMods();
   }, [loadMods]);
+
+  useEffect(() => {
+    loadProfiles();
+  }, [loadProfiles]);
 
   const disabledDir = modsDirPath ? getDisabledDir(modsDirPath) : "";
   const getFilePath = useCallback(
@@ -117,11 +178,27 @@ export function Installed({ modsDirPath, proxyBaseUrl }: InstalledProps) {
         );
         await writeInstalledMods(updated);
         setMods(updated);
+        if (profilesData?.activeProfileId != null && mod.id != null) {
+          const active = profilesData.profiles.find(
+            (p) => p.id === profilesData.activeProfileId
+          );
+          if (active) {
+            const enabledIds = updated
+              .filter((m) => m.enabled && m.id != null)
+              .map((m) => m.id!);
+            const next = profilesData.profiles.map((p) =>
+              p.id === active.id ? { ...p, enabledModIds: enabledIds } : p
+            );
+            const nextData = { ...profilesData, profiles: next };
+            await writeProfiles(nextData);
+            setProfilesData(nextData);
+          }
+        }
       } catch (e) {
         setActionError(String(e));
       }
     },
-    [modsDirPath, disabledDir, mods, getFilePath]
+    [modsDirPath, disabledDir, mods, getFilePath, profilesData]
   );
 
   const handleRemove = useCallback(
@@ -197,6 +274,349 @@ export function Installed({ modsDirPath, proxyBaseUrl }: InstalledProps) {
   const ignoreUntracked = useCallback(() => {
     setRescanModal(null);
   }, []);
+
+  const activeProfile =
+    profilesData?.activeProfileId != null && profilesData?.profiles
+      ? profilesData.profiles.find(
+          (p) => p.id === profilesData.activeProfileId
+        ) ?? null
+      : null;
+
+  function computeProfileSwitch(
+    profile: ProfileRecord
+  ): { toEnable: InstalledModRecord[]; toDisable: InstalledModRecord[] } {
+    const enabledSet = new Set(profile.enabledModIds);
+    const toEnable = mods.filter(
+      (m) => m.id != null && enabledSet.has(m.id) && !m.enabled
+    );
+    const toDisable = mods.filter(
+      (m) => m.id != null && !enabledSet.has(m.id) && m.enabled
+    );
+    return { toEnable, toDisable };
+  }
+
+  const requestProfileSwitch = useCallback(
+    (profile: ProfileRecord) => {
+      const { toEnable, toDisable } = computeProfileSwitch(profile);
+      if (toEnable.length === 0 && toDisable.length === 0) {
+        setProfilesData((prev) =>
+          prev ? { ...prev, activeProfileId: profile.id } : null
+        );
+        writeProfiles({
+          ...profilesData!,
+          activeProfileId: profile.id,
+        }).then(() => loadProfiles()).catch(() => {});
+        return;
+      }
+      setSwitchDryRun({ profile, toEnable, toDisable });
+    },
+    [mods, profilesData]
+  );
+
+  const cancelSwitchDryRun = useCallback(() => {
+    setSwitchDryRun(null);
+  }, []);
+
+  const applyProfileSwitch = useCallback(async () => {
+    if (!switchDryRun || !modsDirPath || !profilesData) return;
+    setApplyingProfile(true);
+    setActionError(null);
+    setExportImportError(null);
+    try {
+      await ensureModsDisabledDir(modsDirPath);
+      const baseMods = modsDirPath.replace(/\\/g, "/").replace(/\/$/, "");
+      const baseDisabled = disabledDir.replace(/\\/g, "/").replace(/\/$/, "");
+      let updatedMods = [...mods];
+      const total = switchDryRun.toEnable.length + switchDryRun.toDisable.length;
+      let done = 0;
+      for (const mod of switchDryRun.toDisable) {
+        const fromPath = getFilePath(mod);
+        const toPath = `${baseDisabled}/${mod.installedFilename}`;
+        const finalPath = await moveModFile(fromPath, toPath);
+        const newFilename = finalPath.replace(/^.*[/\\]/, "");
+        updatedMods = updatedMods.map((m) =>
+          m.id === mod.id
+            ? { ...m, enabled: false, installedFilename: newFilename }
+            : m
+        );
+        done++;
+        setSwitchDryRun((prev) =>
+          prev ? { ...prev, progress: { done, total } } : null
+        );
+      }
+      for (const mod of switchDryRun.toEnable) {
+        const fromPath = getFilePath({ ...mod, enabled: false });
+        const toPath = `${baseMods}/${mod.installedFilename}`;
+        const finalPath = await moveModFile(fromPath, toPath);
+        const newFilename = finalPath.replace(/^.*[/\\]/, "");
+        updatedMods = updatedMods.map((m) =>
+          m.id === mod.id
+            ? { ...m, enabled: true, installedFilename: newFilename }
+            : m
+        );
+        done++;
+        setSwitchDryRun((prev) =>
+          prev ? { ...prev, progress: { done, total } } : null
+        );
+      }
+      await writeInstalledMods(updatedMods);
+      setMods(updatedMods);
+      const nextData = {
+        ...profilesData,
+        activeProfileId: switchDryRun.profile.id,
+      };
+      await writeProfiles(nextData);
+      setProfilesData(nextData);
+      setSwitchDryRun(null);
+    } catch (e) {
+      setActionError(String(e));
+    } finally {
+      setApplyingProfile(false);
+    }
+  }, [
+    switchDryRun,
+    modsDirPath,
+    profilesData,
+    mods,
+    disabledDir,
+    getFilePath,
+  ]);
+
+  const handleCreateProfile = useCallback(
+    async (name: string, fromCurrent: boolean) => {
+      if (!profilesData || name.trim() === "") return;
+      const enabledIds = fromCurrent
+        ? mods.filter((m) => m.enabled && m.id != null).map((m) => m.id!)
+        : [];
+      const newProfile = createProfile(profilesData, name.trim(), enabledIds);
+      const nextData = addProfile(profilesData, newProfile, true);
+      await writeProfiles(nextData);
+      setProfilesData(nextData);
+      setProfileModal(null);
+    },
+    [profilesData, mods]
+  );
+
+  const handleRenameProfile = useCallback(
+    async (profileId: number, name: string) => {
+      if (!profilesData || name.trim() === "") return;
+      const nextData = renameProfileInData(profilesData, profileId, name.trim());
+      await writeProfiles(nextData);
+      setProfilesData(nextData);
+      setProfileModal(null);
+    },
+    [profilesData]
+  );
+
+  const handleDeleteProfile = useCallback(
+    async (profile: ProfileRecord) => {
+      if (!profilesData) return;
+      const nextData = deleteProfileFromData(profilesData, profile.id);
+      await writeProfiles(nextData);
+      setProfilesData(nextData);
+      setProfileModal(null);
+    },
+    [profilesData]
+  );
+
+  const handleExportProfile = useCallback(
+    async (profile: ProfileRecord) => {
+      setExportImportError(null);
+      const profileMods = mods.filter(
+        (m) => m.id != null && profile.enabledModIds.includes(m.id)
+      );
+      const exported: ExportedProfile = {
+        name: profile.name,
+        exportedAt: new Date().toISOString(),
+        mods: profileMods.map((m) => {
+          const entry: ExportedProfileMod = {
+            provider: m.provider,
+            slug: m.slug,
+            name: m.name,
+          };
+          if (m.provider === "curseforge" && m.projectId != null) {
+            entry.projectId = m.projectId;
+            const fid =
+              typeof m.installedFileId === "number"
+                ? m.installedFileId
+                : undefined;
+            if (fid != null) entry.fileId = fid;
+          }
+          if (m.provider === "orbis" && m.resourceId != null) {
+            entry.resourceId = m.resourceId;
+            const v = m.installedFileId;
+            if (typeof v === "string" && v.includes(":")) {
+              const [versionId, fileIndex] = v.split(":");
+              entry.versionId = versionId;
+              const idx = parseInt(fileIndex, 10);
+              if (!Number.isNaN(idx)) entry.fileIndex = idx;
+            }
+          }
+          return entry;
+        }),
+      };
+      try {
+        const path = await saveFileDialog({
+          filters: [{ name: "JSON", extensions: ["json"] }],
+          defaultPath: `hyghertales-profile-${profile.name.replace(/[^a-z0-9-_]/gi, "-")}.json`,
+        });
+        if (path) {
+          await writeTextFile(path, JSON.stringify(exported, null, 2));
+        }
+      } catch (e) {
+        setExportImportError(String(e));
+      }
+    },
+    [mods]
+  );
+
+  const handleImportProfile = useCallback(async () => {
+    if (!modsDirPath?.trim() || !profilesData) return;
+    setExportImportError(null);
+    try {
+      const path = await openFileDialog({
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+      if (!path || typeof path !== "string") return;
+      const raw = await readTextFile(path);
+      const parsed = JSON.parse(raw) as ExportedProfile;
+      if (!parsed.name || !Array.isArray(parsed.mods)) {
+        throw new Error("Invalid profile file format.");
+      }
+      let currentMods = await readInstalledMods();
+      const enabledIds: number[] = [];
+      for (const entry of parsed.mods as ExportedProfileMod[]) {
+        const match = currentMods.find((m) => {
+          if (m.provider !== entry.provider) return false;
+          if (entry.provider === "curseforge" && entry.projectId != null)
+            return m.projectId === entry.projectId;
+          if (entry.provider === "orbis" && entry.resourceId != null)
+            return m.resourceId === entry.resourceId;
+          return false;
+        });
+        if (match?.id != null) {
+          enabledIds.push(match.id);
+          continue;
+        }
+        if (entry.provider === "curseforge" && entry.fileId == null && entry.projectId != null) {
+          const res = await getModFiles(proxyBaseUrl, "curseforge", String(entry.projectId));
+          const latest = getLatestFile("curseforge", res.files);
+          if (!latest?.fileId) continue;
+          entry.fileId = latest.fileId;
+        }
+        if (entry.provider === "orbis" && (entry.versionId == null || entry.fileIndex == null) && entry.resourceId != null) {
+          const res = await getModFiles(proxyBaseUrl, "orbis", entry.resourceId);
+          const latest = getLatestFile("orbis", res.files);
+          if (!latest?.versionId || latest.fileIndex == null) continue;
+          entry.versionId = latest.versionId;
+          entry.fileIndex = latest.fileIndex;
+        }
+        let url: string;
+        if (entry.provider === "curseforge" && entry.projectId != null && entry.fileId != null) {
+          const r = await getDownloadUrlCurseForge(proxyBaseUrl, entry.projectId, entry.fileId);
+          url = r.url;
+        } else if (
+          entry.provider === "orbis" &&
+          entry.resourceId != null &&
+          entry.versionId != null &&
+          entry.fileIndex != null
+        ) {
+          const r = await getDownloadUrlOrbis(
+            proxyBaseUrl,
+            entry.resourceId,
+            entry.versionId,
+            entry.fileIndex
+          );
+          url = r.url;
+        } else {
+          continue;
+        }
+        const baseDir = modsDirPath.replace(/\\/g, "/").replace(/\/$/, "");
+        const fileName = `${entry.slug || "mod"}.jar`;
+        const destPath = `${baseDir}/${fileName}`;
+        const finalPath = await downloadFileToPath(url, destPath);
+        const installedFilename = finalPath.replace(/^.*[/\\]/, "");
+        const newId = nextId(currentMods);
+        const newRecord: InstalledModRecord = {
+          id: newId,
+          provider: entry.provider,
+          projectId: entry.provider === "curseforge" ? entry.projectId : null,
+          resourceId: entry.provider === "orbis" ? entry.resourceId : null,
+          slug: entry.slug,
+          name: entry.name,
+          installedFileId:
+            entry.provider === "curseforge"
+              ? entry.fileId ?? null
+              : entry.versionId != null && entry.fileIndex != null
+                ? `${entry.versionId}:${entry.fileIndex}`
+                : null,
+          installedFilename,
+          installedAt: new Date().toISOString(),
+          sourceUrl:
+            entry.provider === "orbis"
+              ? `https://www.orbis.place/mod/${entry.slug}`
+              : undefined,
+          enabled: true,
+        };
+        currentMods = [...currentMods, newRecord];
+        await writeInstalledMods(currentMods);
+        enabledIds.push(newId);
+      }
+      setMods(currentMods);
+      const newProfile = createProfile(
+        profilesData,
+        `Imported: ${parsed.name}`,
+        enabledIds
+      );
+      const nextData = addProfile(profilesData, newProfile, true);
+      await writeProfiles(nextData);
+      setProfilesData(nextData);
+      await ensureModsDisabledDir(modsDirPath);
+      const baseMods = modsDirPath.replace(/\\/g, "/").replace(/\/$/, "");
+      const baseDisabled = getDisabledDir(modsDirPath).replace(/\\/g, "/").replace(/\/$/, "");
+      const enabledSet = new Set(enabledIds);
+      let finalMods = currentMods.map((m) => ({
+        ...m,
+        enabled: m.id != null && enabledSet.has(m.id),
+      }));
+      for (const mod of currentMods) {
+        const shouldEnable = mod.id != null && enabledSet.has(mod.id);
+        if (shouldEnable && !mod.enabled) {
+          const fromPath = `${baseDisabled}/${mod.installedFilename}`;
+          const toPath = `${baseMods}/${mod.installedFilename}`;
+          try {
+            const finalPath = await moveModFile(fromPath, toPath);
+            const newFilename = finalPath.replace(/^.*[/\\]/, "");
+            finalMods = finalMods.map((m) =>
+              m.id === mod.id ? { ...m, enabled: true, installedFilename: newFilename } : m
+            );
+          } catch {
+            /* file may already be in Mods */
+          }
+        } else if (!shouldEnable && mod.enabled) {
+          const fromPath = `${baseMods}/${mod.installedFilename}`;
+          const toPath = `${baseDisabled}/${mod.installedFilename}`;
+          try {
+            const finalPath = await moveModFile(fromPath, toPath);
+            const newFilename = finalPath.replace(/^.*[/\\]/, "");
+            finalMods = finalMods.map((m) =>
+              m.id === mod.id ? { ...m, enabled: false, installedFilename: newFilename } : m
+            );
+          } catch {
+            /* file may already be in Mods.disabled */
+          }
+        }
+      }
+      await writeInstalledMods(finalMods);
+      setMods(finalMods);
+    } catch (e) {
+      setExportImportError(String(e));
+    }
+  }, [
+    modsDirPath,
+    profilesData,
+    proxyBaseUrl,
+  ]);
 
   const canCheckUpdate = (mod: InstalledModRecord): boolean => {
     if (isUntracked(mod) || mod.pinned) return false;
@@ -375,6 +795,82 @@ export function Installed({ modsDirPath, proxyBaseUrl }: InstalledProps) {
   return (
     <section className="page">
       <h2>Installed mods</h2>
+      <div className="profile-switcher">
+        <label className="profile-switcher-label">
+          Profile
+          <select
+            value={profilesData?.activeProfileId ?? ""}
+            aria-label="Active profile"
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === "") {
+                if (profilesData?.activeProfileId != null) {
+                  setProfilesData((prev) =>
+                    prev ? { ...prev, activeProfileId: null } : null
+                  );
+                  writeProfiles({
+                    ...profilesData!,
+                    activeProfileId: null,
+                  }).then(() => loadProfiles()).catch(() => {});
+                }
+                return;
+              }
+              const id = Number(v);
+              const profile = profilesData?.profiles.find((p) => p.id === id);
+              if (profile) requestProfileSwitch(profile);
+            }}
+          >
+            <option value="">No profile</option>
+            {profilesData?.profiles.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="profile-switcher-buttons">
+          <button
+            type="button"
+            onClick={() => {
+              setProfileModal("create");
+              setCreateProfileDraft({ name: "", fromCurrent: true });
+            }}
+          >
+            Create
+          </button>
+          <button
+            type="button"
+            disabled={!activeProfile}
+            onClick={() => {
+              if (activeProfile) {
+                setProfileModal({ rename: activeProfile });
+                setRenameProfileDraft(activeProfile.name);
+              }
+            }}
+          >
+            Rename
+          </button>
+          <button
+            type="button"
+            disabled={!activeProfile}
+            onClick={() =>
+              activeProfile && setProfileModal({ delete: activeProfile })
+            }
+          >
+            Delete
+          </button>
+          <button
+            type="button"
+            disabled={!activeProfile}
+            onClick={() => activeProfile && handleExportProfile(activeProfile)}
+          >
+            Export
+          </button>
+          <button type="button" onClick={handleImportProfile}>
+            Import
+          </button>
+        </div>
+      </div>
       <div className="installed-toolbar">
         <button type="button" onClick={runRescan} disabled={loading}>
           Rescan folders
@@ -400,6 +896,11 @@ export function Installed({ modsDirPath, proxyBaseUrl }: InstalledProps) {
       {updateError && (
         <div className="error-banner" role="alert">
           {updateError}
+        </div>
+      )}
+      {exportImportError && (
+        <div className="error-banner" role="alert">
+          {exportImportError}
         </div>
       )}
       {actionError && (
@@ -571,6 +1072,228 @@ export function Installed({ modsDirPath, proxyBaseUrl }: InstalledProps) {
               <button type="button" onClick={ignoreUntracked}>
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {profileModal === "create" && createProfileDraft != null && (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal">
+            <div className="modal-header">
+              <h3>Create profile</h3>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => {
+                  setProfileModal(null);
+                  setCreateProfileDraft(null);
+                }}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <label>
+                Name
+                <input
+                  type="text"
+                  value={createProfileDraft.name}
+                  onChange={(e) =>
+                    setCreateProfileDraft((d) =>
+                      d ? { ...d, name: e.target.value } : d
+                    )
+                  }
+                  placeholder="Profile name"
+                />
+              </label>
+              <label className="profile-create-from-current">
+                <input
+                  type="checkbox"
+                  checked={createProfileDraft.fromCurrent}
+                  onChange={(e) =>
+                    setCreateProfileDraft((d) =>
+                      d ? { ...d, fromCurrent: e.target.checked } : d
+                    )
+                  }
+                />
+                Start from current enabled mod set
+              </label>
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProfileModal(null);
+                    setCreateProfileDraft(null);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!createProfileDraft.name.trim()}
+                  onClick={() =>
+                    handleCreateProfile(
+                      createProfileDraft.name,
+                      createProfileDraft.fromCurrent
+                    )
+                  }
+                >
+                  Create
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {profileModal !== null && profileModal !== "create" && "rename" in profileModal && (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal">
+            <div className="modal-header">
+              <h3>Rename profile</h3>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => {
+                  setProfileModal(null);
+                  setRenameProfileDraft("");
+                }}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <label>
+                Name
+                <input
+                  type="text"
+                  value={renameProfileDraft}
+                  onChange={(e) => setRenameProfileDraft(e.target.value)}
+                  placeholder="Profile name"
+                />
+              </label>
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProfileModal(null);
+                    setRenameProfileDraft("");
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!renameProfileDraft.trim()}
+                  onClick={() =>
+                    handleRenameProfile(profileModal.rename.id, renameProfileDraft)
+                  }
+                >
+                  Rename
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {profileModal !== null && profileModal !== "create" && "delete" in profileModal && (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal">
+            <div className="modal-header">
+              <h3>Delete profile?</h3>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setProfileModal(null)}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <p>
+                Delete profile &quot;{profileModal.delete.name}&quot;? This does
+                not remove any mod files.
+              </p>
+              <div className="modal-actions">
+                <button type="button" onClick={() => setProfileModal(null)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="danger-button"
+                  onClick={() => handleDeleteProfile(profileModal.delete)}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {switchDryRun && (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal modal-wide">
+            <div className="modal-header">
+              <h3>Switch to &quot;{switchDryRun.profile.name}&quot;</h3>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={cancelSwitchDryRun}
+                disabled={applyingProfile}
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              {switchDryRun.progress ? (
+                <p>
+                  Applying… {switchDryRun.progress.done} / {switchDryRun.progress.total} files
+                  moved.
+                </p>
+              ) : (
+                <>
+                  <p>Summary: the following mods will be moved (no files will be deleted).</p>
+                  {switchDryRun.toEnable.length > 0 && (
+                    <>
+                      <h4>Enable ({switchDryRun.toEnable.length})</h4>
+                      <ul className="rescan-list">
+                        {switchDryRun.toEnable.map((m) => (
+                          <li key={m.id}>{m.name}</li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                  {switchDryRun.toDisable.length > 0 && (
+                    <>
+                      <h4>Disable ({switchDryRun.toDisable.length})</h4>
+                      <ul className="rescan-list">
+                        {switchDryRun.toDisable.map((m) => (
+                          <li key={m.id}>{m.name}</li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                  <div className="modal-actions">
+                    <button type="button" onClick={cancelSwitchDryRun}>
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={applyProfileSwitch}
+                      disabled={applyingProfile}
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

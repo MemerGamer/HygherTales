@@ -39,6 +39,24 @@ pub struct InstalledModRecord {
 }
 
 const INSTALLED_MODS_FILENAME: &str = "installed_mods.json";
+const PROFILES_FILENAME: &str = "profiles.json";
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfileRecord {
+    pub id: i64,
+    pub name: String,
+    pub created_at: String,
+    pub enabled_mod_ids: Vec<i64>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfilesData {
+    pub next_id: i64,
+    pub active_profile_id: Option<i64>,
+    pub profiles: Vec<ProfileRecord>,
+}
 
 fn app_installed_mods_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let dir = app
@@ -47,6 +65,38 @@ fn app_installed_mods_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .map_err(|e| format!("{e}"))?;
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir.join(INSTALLED_MODS_FILENAME))
+}
+
+fn app_profiles_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("{e}"))?;
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir.join(PROFILES_FILENAME))
+}
+
+#[tauri::command]
+fn read_profiles(app: tauri::AppHandle) -> Result<ProfilesData, String> {
+    let path = app_profiles_path(&app)?;
+    if !path.exists() {
+        return Ok(ProfilesData {
+            next_id: 1,
+            active_profile_id: None,
+            profiles: Vec::new(),
+        });
+    }
+    let data = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let parsed: ProfilesData = serde_json::from_str(&data).map_err(|e| e.to_string())?;
+    Ok(parsed)
+}
+
+#[tauri::command]
+fn write_profiles(app: tauri::AppHandle, data: ProfilesData) -> Result<(), String> {
+    let path = app_profiles_path(&app)?;
+    let json = serde_json::to_string_pretty(&data).map_err(|e| e.to_string())?;
+    fs::write(&path, json).map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[tauri::command]
@@ -328,6 +378,30 @@ fn apply_mod_update(
     Ok(new_filename.to_string())
 }
 
+/// Write UTF-8 text to a file. Used for export (e.g. profile JSON). Creates parent dirs.
+#[tauri::command]
+fn write_text_file(path: String, content: String) -> Result<(), String> {
+    let p = PathBuf::from(path.trim());
+    if p.as_os_str().is_empty() {
+        return Err("Path is empty".to_string());
+    }
+    if let Some(parent) = p.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    fs::write(&p, content).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Read a file as UTF-8 text. Used for import (e.g. profile JSON).
+#[tauri::command]
+fn read_text_file(path: String) -> Result<String, String> {
+    let p = PathBuf::from(path.trim());
+    if !p.exists() || !p.is_file() {
+        return Err("File does not exist or is not a file".to_string());
+    }
+    fs::read_to_string(&p).map_err(|e| e.to_string())
+}
+
 /// Open a path (file or folder) in the system file manager. Does not use the shell plugin
 /// so file:// URLs are not needed; the shell plugin only allows http/https/mailto/tel.
 #[tauri::command]
@@ -379,6 +453,8 @@ pub fn run() {
             check_path_access,
             read_installed_mods,
             write_installed_mods,
+            read_profiles,
+            write_profiles,
             ensure_mods_disabled_dir,
             move_mod_file,
             move_file_to_trash,
@@ -386,6 +462,8 @@ pub fn run() {
             download_file_to_path,
             open_path_in_file_manager,
             apply_mod_update,
+            write_text_file,
+            read_text_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

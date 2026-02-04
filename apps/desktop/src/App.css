@@ -495,6 +495,72 @@
   font-size: 0.9rem;
 }
 
+/* Profile switcher (Installed page) */
+.profile-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.profile-switcher-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.profile-switcher-label select {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.9rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+}
+
+.profile-switcher-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.profile-switcher-buttons button {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: #eee;
+  cursor: pointer;
+}
+
+.profile-switcher-buttons button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.profile-switcher-buttons button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.profile-create-from-current {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+}
+
+.profile-create-from-current input {
+  cursor: pointer;
+}
+
 /* Installed mods page */
 .installed-toolbar {
   margin-bottom: 1rem;
