@@ -3,10 +3,16 @@ import {
   healthResponseSchema,
   modSearchResponseSchema,
   modCategoriesResponseSchema,
+  modDetailsResponseSchema,
+  modFilesResponseSchema,
+  downloadResponseSchema,
   errorResponseSchema,
   type ModSearchRequest,
   type ModSearchResponse,
   type ModCategoriesResponse,
+  type ModDetailsResponse,
+  type ModFilesResponse,
+  type DownloadResponse,
   type ErrorResponse,
 } from "@hyghertales/shared";
 
@@ -137,5 +143,58 @@ export async function getOrbisSearch(
     baseUrl,
     `/v1/orbis/search?${searchParams.toString()}`,
     modSearchResponseSchema
+  );
+}
+
+/** Mod details by provider and id (projectId for CurseForge, resourceId for Orbis). */
+export async function getModDetails(
+  baseUrl: string,
+  provider: "curseforge" | "orbis",
+  id: string
+): Promise<ModDetailsResponse> {
+  return fetchJson<ModDetailsResponse>(
+    baseUrl,
+    `/v1/mod/${provider}/${encodeURIComponent(id)}`,
+    modDetailsResponseSchema
+  );
+}
+
+/** Mod files/versions by provider and id. */
+export async function getModFiles(
+  baseUrl: string,
+  provider: "curseforge" | "orbis",
+  id: string
+): Promise<ModFilesResponse> {
+  return fetchJson<ModFilesResponse>(
+    baseUrl,
+    `/v1/mod/${provider}/${encodeURIComponent(id)}/files`,
+    modFilesResponseSchema
+  );
+}
+
+/** CurseForge: get download URL for a file. */
+export async function getDownloadUrlCurseForge(
+  baseUrl: string,
+  projectId: number,
+  fileId: number
+): Promise<DownloadResponse> {
+  return fetchJson<DownloadResponse>(
+    baseUrl,
+    `/v1/download/curseforge/${projectId}/${fileId}`,
+    downloadResponseSchema
+  );
+}
+
+/** Orbis: get download URL for a version file (or use file.downloadUrl from getModFiles if present). */
+export async function getDownloadUrlOrbis(
+  baseUrl: string,
+  resourceId: string,
+  versionId: string,
+  fileIndex: number
+): Promise<DownloadResponse> {
+  return fetchJson<DownloadResponse>(
+    baseUrl,
+    `/v1/download/orbis/${encodeURIComponent(resourceId)}/${encodeURIComponent(versionId)}/${fileIndex}`,
+    downloadResponseSchema
   );
 }

@@ -23,6 +23,8 @@ export {
   type ResolveFromUrlResponse,
   downloadResponseSchema,
   type DownloadResponse,
+  installedModSchema,
+  type InstalledMod,
   errorResponseSchema,
   type ErrorResponse,
 } from "./schemas.js";

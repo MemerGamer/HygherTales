@@ -4,9 +4,11 @@ import {
   resolveFromUrlResponseSchema,
 } from "@hyghertales/shared";
 import type { CurseForgeClient } from "../lib/curseforge.js";
+import type { OrbisClient } from "../lib/orbis.js";
+import { parseOrbisModUrl } from "../lib/orbisUrl.js";
 import { AppError } from "../lib/errors.js";
 
-export function createResolveRoutes(cf: CurseForgeClient) {
+export function createResolveRoutes(cf: CurseForgeClient, orbis: OrbisClient) {
   const resolve = new Hono();
 
   resolve.post("/", async (c) => {
@@ -31,17 +33,32 @@ export function createResolveRoutes(cf: CurseForgeClient) {
       );
     }
 
-    const result = await cf.resolveFromUrl(parsed.data.url);
-    if (result == null) {
-      throw new AppError(
-        "NOT_FOUND",
-        "Could not resolve URL to a CurseForge mod",
-        404
-      );
+    const url = parsed.data.url;
+
+    const cfResult = await cf.resolveFromUrl(url);
+    if (cfResult != null) {
+      const response = resolveFromUrlResponseSchema.parse(cfResult);
+      return c.json(response);
     }
 
-    const response = resolveFromUrlResponseSchema.parse(result);
-    return c.json(response);
+    const orbisParsed = parseOrbisModUrl(url);
+    if (orbisParsed != null) {
+      const details = await orbis.getResourceBySlug(orbisParsed.slug);
+      if (details != null && details.provider === "orbis") {
+        const response = resolveFromUrlResponseSchema.parse({
+          provider: "orbis",
+          resourceId: details.resourceId,
+          slug: details.slug,
+        });
+        return c.json(response);
+      }
+    }
+
+    throw new AppError(
+      "NOT_FOUND",
+      "Could not resolve URL to a CurseForge or Orbis.place mod",
+      404
+    );
   });
 
   return resolve;

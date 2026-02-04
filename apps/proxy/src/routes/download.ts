@@ -2,27 +2,31 @@ import { Hono } from "hono";
 import { z } from "@hyghertales/shared";
 import { downloadResponseSchema } from "@hyghertales/shared";
 import type { CurseForgeClient } from "../lib/curseforge.js";
+import type { OrbisClient } from "../lib/orbis.js";
 import { AppError } from "../lib/errors.js";
 
 /**
- * Download helper: GET /v1/download/:projectId/:fileId
- *
- * We return JSON { url: string } (Option A) rather than streaming file bytes (Option B)
- * so that: (1) the client can download directly from CurseForge, avoiding proxy bandwidth;
- * (2) CurseForge often returns time-limited signed URLs—streaming would require the proxy
- * to hold the connection and could hit token expiry; (3) the proxy stays stateless.
+ * Download helper: returns JSON { url: string } so the client can download directly.
+ * CurseForge: GET /v1/download/curseforge/:projectId/:fileId
+ * Orbis: GET /v1/download/orbis/:resourceId/:versionId/:fileIndex
  * We never log full URLs because they may contain tokens.
  */
-const paramsSchema = z.object({
+const cfParamsSchema = z.object({
   projectId: z.coerce.number().int().min(1),
   fileId: z.coerce.number().int().min(1),
 });
 
-export function createDownloadRoutes(cf: CurseForgeClient) {
+const orbisParamsSchema = z.object({
+  resourceId: z.string().min(1),
+  versionId: z.string().min(1),
+  fileIndex: z.coerce.number().int().min(0),
+});
+
+export function createDownloadRoutes(cf: CurseForgeClient, orbis: OrbisClient) {
   const download = new Hono();
 
-  download.get("/:projectId/:fileId", async (c) => {
-    const parsed = paramsSchema.safeParse(c.req.param());
+  download.get("/curseforge/:projectId/:fileId", async (c) => {
+    const parsed = cfParamsSchema.safeParse(c.req.param());
     if (!parsed.success) {
       throw new AppError(
         "VALIDATION_ERROR",
@@ -43,6 +47,34 @@ export function createDownloadRoutes(cf: CurseForgeClient) {
     }
 
     const body = downloadResponseSchema.parse({ url });
+    return c.json(body);
+  });
+
+  download.get("/orbis/:resourceId/:versionId/:fileIndex", async (c) => {
+    const parsed = orbisParamsSchema.safeParse(c.req.param());
+    if (!parsed.success) {
+      throw new AppError(
+        "VALIDATION_ERROR",
+        "Invalid resourceId, versionId or fileIndex",
+        400
+      );
+    }
+
+    const { resourceId, versionId, fileIndex } = parsed.data;
+    const filesResponse = await orbis.getVersions(resourceId);
+    const file = filesResponse.files.find(
+      (f) => f.versionId === versionId && f.fileIndex === fileIndex
+    );
+
+    if (file?.downloadUrl == null || file.downloadUrl === "") {
+      throw new AppError(
+        "DOWNLOAD_NOT_AVAILABLE",
+        "Download URL is not available for this Orbis file.",
+        503
+      );
+    }
+
+    const body = downloadResponseSchema.parse({ url: file.downloadUrl });
     return c.json(body);
   });
 

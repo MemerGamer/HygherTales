@@ -134,6 +134,7 @@ fn check_writable(path: &std::path::Path) -> bool {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
             get_default_hytale_mods_paths,
             ensure_mods_dir,

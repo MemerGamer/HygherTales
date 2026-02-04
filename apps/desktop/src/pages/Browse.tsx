@@ -5,9 +5,37 @@ import {
   getCategories,
   getOrbisFeatured,
   getOrbisSearch,
+  getModDetails,
+  getModFiles,
+  getDownloadUrlCurseForge,
+  getDownloadUrlOrbis,
   ApiError,
 } from "../lib/api";
-import type { ModSummary, ModCategory } from "@hyghertales/shared";
+import { marked } from "marked";
+import { loadBrowseSource, saveBrowseSource } from "../lib/settings";
+import type { ModSummary, ModCategory, ModDetailsResponse, ModFile } from "@hyghertales/shared";
+
+/** Parse description that may be Markdown, HTML, or both. Returns HTML string. */
+function parseDescriptionToHtml(description: string): string {
+  try {
+    return marked.parse(description, {
+      gfm: true,
+      breaks: true,
+    }) as string;
+  } catch {
+    return description;
+  }
+}
+
+/** Open URL in system browser (Tauri) or new tab (web). */
+async function openExternalUrl(url: string): Promise<void> {
+  try {
+    const { open } = await import("@tauri-apps/plugin-shell");
+    await open(url);
+  } catch {
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+}
 
 type ModSource = "curseforge" | "orbis";
 
@@ -31,7 +59,7 @@ interface BrowseProps {
 }
 
 export function Browse({ proxyBaseUrl }: BrowseProps) {
-  const [source, setSource] = useState<ModSource>("curseforge");
+  const [source, setSource] = useState<ModSource>(loadBrowseSource);
   const [query, setQuery] = useState("");
   const [categoryId, setCategoryId] = useState<number>(0);
   const [sortField, setSortField] = useState(2);
@@ -42,6 +70,12 @@ export function Browse({ proxyBaseUrl }: BrowseProps) {
   const [totalCount, setTotalCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [selectedMod, setSelectedMod] = useState<ModSummary | null>(null);
+  const [detail, setDetail] = useState<ModDetailsResponse | null>(null);
+  const [detailFiles, setDetailFiles] = useState<ModFile[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
 
   const loadFeatured = useCallback(async () => {
     setError(null);
@@ -130,6 +164,91 @@ export function Browse({ proxyBaseUrl }: BrowseProps) {
       ? `${mod.provider}-${mod.projectId}`
       : `${mod.provider}-${mod.resourceId}`;
 
+  const modId = (mod: ModSummary) =>
+    mod.provider === "curseforge" ? String(mod.projectId) : mod.resourceId;
+
+  const openModDetail = useCallback(
+    async (mod: ModSummary) => {
+      setSelectedMod(mod);
+      setDetail(null);
+      setDetailFiles([]);
+      setDetailError(null);
+      setDetailLoading(true);
+      try {
+        const id = modId(mod);
+        const [detailsRes, filesRes] = await Promise.all([
+          getModDetails(proxyBaseUrl, mod.provider, id),
+          getModFiles(proxyBaseUrl, mod.provider, id),
+        ]);
+        setDetail(detailsRes);
+        setDetailFiles(filesRes.files);
+      } catch (e) {
+        setDetailError(
+          e instanceof ApiError ? e.body?.message ?? e.message : "Failed to load mod details"
+        );
+      } finally {
+        setDetailLoading(false);
+      }
+    },
+    [proxyBaseUrl]
+  );
+
+  const closeModDetail = useCallback(() => {
+    setSelectedMod(null);
+    setDetail(null);
+    setDetailFiles([]);
+    setDetailError(null);
+    setDownloadingFile(null);
+  }, []);
+
+  const handleDownloadFile = useCallback(
+    async (file: ModFile) => {
+      if (!selectedMod || !detail) return;
+      const key =
+        selectedMod.provider === "curseforge"
+          ? `cf-${file.fileId}`
+          : `orbis-${file.versionId}-${file.fileIndex}`;
+      setDownloadingFile(key);
+      try {
+        let url: string;
+        if (selectedMod.provider === "curseforge" && detail.provider === "curseforge" && file.fileId != null) {
+          const res = await getDownloadUrlCurseForge(proxyBaseUrl, detail.projectId, file.fileId);
+          url = res.url;
+        } else if (
+          selectedMod.provider === "orbis" &&
+          detail.provider === "orbis" &&
+          file.versionId != null &&
+          file.fileIndex != null
+        ) {
+          const res = await getDownloadUrlOrbis(
+            proxyBaseUrl,
+            detail.resourceId,
+            file.versionId,
+            file.fileIndex
+          );
+          url = res.url;
+        } else if (file.downloadUrl) {
+          url = file.downloadUrl;
+        } else {
+          throw new Error("Cannot get download URL for this file");
+        }
+        await openExternalUrl(url);
+      } catch (e) {
+        setDetailError(
+          e instanceof ApiError ? e.body?.message ?? e.message : "Download failed"
+        );
+      } finally {
+        setDownloadingFile(null);
+      }
+    },
+    [proxyBaseUrl, selectedMod, detail]
+  );
+
+  const orbisModUrl = (mod: ModSummary) =>
+    mod.provider === "orbis"
+      ? `https://www.orbis.place/mod/${mod.slug}`
+      : "";
+
   return (
     <section className="page">
       <h2>Browse mods</h2>
@@ -137,7 +256,11 @@ export function Browse({ proxyBaseUrl }: BrowseProps) {
         <select
           aria-label="Mod source"
           value={source}
-          onChange={(e) => setSource(e.target.value as ModSource)}
+          onChange={(e) => {
+            const next = e.target.value as ModSource;
+            setSource(next);
+            saveBrowseSource(next);
+          }}
           disabled={loading}
         >
           <option value="curseforge">CurseForge</option>
@@ -222,7 +345,14 @@ export function Browse({ proxyBaseUrl }: BrowseProps) {
       )}
       <ul className="mod-list">
         {items.map((mod) => (
-          <li key={modKey(mod)} className="mod-card">
+          <li
+            key={modKey(mod)}
+            className="mod-card mod-card-clickable"
+            role="button"
+            tabIndex={0}
+            onClick={() => openModDetail(mod)}
+            onKeyDown={(e) => e.key === "Enter" && openModDetail(mod)}
+          >
             {mod.logoUrl && (
               <img src={mod.logoUrl} alt="" className="mod-logo" />
             )}
@@ -231,14 +361,106 @@ export function Browse({ proxyBaseUrl }: BrowseProps) {
               {mod.summary && <p>{mod.summary}</p>}
               <span className="mod-meta">
                 {mod.provider} · {mod.slug}
-                {mod.provider === "orbis" && (
-                  <> · <a href={`https://www.orbis.place/resources/${mod.resourceId}`} target="_blank" rel="noopener noreferrer">View on Orbis</a></>
+                {mod.provider === "orbis" && orbisModUrl(mod) && (
+                  <> ·{" "}
+                    <button
+                      type="button"
+                      className="link-button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openExternalUrl(orbisModUrl(mod));
+                      }}
+                    >
+                      View on Orbis
+                    </button>
+                  </>
                 )}
               </span>
             </div>
           </li>
         ))}
       </ul>
+
+      {selectedMod && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="mod-detail-title">
+          <div className="modal">
+            <div className="modal-header">
+              <h3 id="mod-detail-title">{selectedMod.name}</h3>
+              <button type="button" className="modal-close" onClick={closeModDetail} aria-label="Close">
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              {detailLoading && <p>Loading…</p>}
+              {detailError && (
+                <div className="error-banner" role="alert">
+                  {detailError}
+                </div>
+              )}
+              {detail && !detailLoading && (
+                <>
+                  {detail.logoUrl && (
+                    <img src={detail.logoUrl} alt="" className="mod-detail-logo" />
+                  )}
+                  {detail.description && (
+                    <div
+                      className="mod-detail-description mod-detail-description-html"
+                      dangerouslySetInnerHTML={{
+                        __html: parseDescriptionToHtml(detail.description),
+                      }}
+                    />
+                  )}
+                  <div className="mod-file-list-wrapper">
+                    <h4>Files / versions</h4>
+                    {detailFiles.length === 0 ? (
+                      <p>No files available.</p>
+                    ) : (
+                      <ul className="mod-file-list">
+                        {detailFiles.map((file, i) => {
+                          const key =
+                            selectedMod.provider === "curseforge"
+                              ? `cf-${file.fileId ?? i}`
+                              : `orbis-${file.versionId ?? ""}-${file.fileIndex ?? i}`;
+                          const isDownloading = downloadingFile === key;
+                          return (
+                            <li key={key} className="mod-file-item">
+                              <span className="mod-file-name">
+                                {file.displayName || file.fileName || `File ${i + 1}`}
+                              </span>
+                              <span className="mod-file-meta">
+                                {file.releaseType && `${file.releaseType} · `}
+                                {file.fileDate ? new Date(file.fileDate).toLocaleDateString() : ""}
+                              </span>
+                              <button
+                                type="button"
+                                disabled={isDownloading}
+                                onClick={() => handleDownloadFile(file)}
+                              >
+                                {isDownloading ? "…" : "Download"}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                  {selectedMod.provider === "orbis" && orbisModUrl(selectedMod) && (
+                    <p className="mod-detail-link">
+                      <button
+                        type="button"
+                        className="link-button"
+                        onClick={() => openExternalUrl(orbisModUrl(selectedMod))}
+                      >
+                        Open on Orbis.place
+                      </button>
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

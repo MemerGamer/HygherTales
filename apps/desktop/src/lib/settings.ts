@@ -51,3 +51,26 @@ export function loadSettings(): Settings {
 export function saveSettings(settings: Settings): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 }
+
+/** Last selected mod source on Browse (CurseForge vs Orbis). */
+const BROWSE_SOURCE_KEY = "hyghertales-browse-source";
+
+export type BrowseModSource = "curseforge" | "orbis";
+
+export function loadBrowseSource(): BrowseModSource {
+  try {
+    const raw = localStorage.getItem(BROWSE_SOURCE_KEY);
+    if (raw === "curseforge" || raw === "orbis") return raw;
+  } catch {
+    /* ignore */
+  }
+  return "curseforge";
+}
+
+export function saveBrowseSource(source: BrowseModSource): void {
+  try {
+    localStorage.setItem(BROWSE_SOURCE_KEY, source);
+  } catch {
+    /* ignore */
+  }
+}

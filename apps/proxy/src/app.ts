@@ -45,9 +45,9 @@ app.route("/health", health);
 app.route("/v1/search", createSearchRoutes(cf));
 app.route("/v1/featured", createFeaturedRoutes(cf));
 app.route("/v1/categories", createCategoriesRoutes(cf));
-app.route("/v1/mod", createModRoutes(cf));
-app.route("/v1/resolve-from-url", createResolveRoutes(cf));
-app.route("/v1/download", createDownloadRoutes(cf));
+app.route("/v1/mod", createModRoutes(cf, orbis));
+app.route("/v1/resolve-from-url", createResolveRoutes(cf, orbis));
+app.route("/v1/download", createDownloadRoutes(cf, orbis));
 app.route("/v1/orbis", createOrbisRoutes(orbis));
 
 // Central error handler: return ErrorResponse consistently

@@ -90,9 +90,12 @@ export const modDetailsResponseSchema = z.discriminatedUnion("provider", [
 export type ModDetailsResponse = z.infer<typeof modDetailsResponseSchema>;
 
 // --- Mod files ---
+// CurseForge: fileId required. Orbis: versionId + fileIndex required, downloadUrl required.
 
 export const modFileSchema = z.object({
-  fileId: z.number().int(),
+  fileId: z.number().int().optional(), // CurseForge
+  versionId: z.string().optional(), // Orbis
+  fileIndex: z.number().int().min(0).optional(), // Orbis: index in version.files[]
   fileName: z.string(),
   displayName: z.string().nullable().optional(),
   releaseType: z.string().nullable().optional(),
@@ -116,11 +119,22 @@ export const resolveFromUrlRequestSchema = z.object({
 
 export type ResolveFromUrlRequest = z.infer<typeof resolveFromUrlRequestSchema>;
 
-export const resolveFromUrlResponseSchema = z.object({
+export const resolveFromUrlResponseCurseForgeSchema = z.object({
   provider: z.literal("curseforge"),
   projectId: z.number().int(),
   slug: z.string(),
 });
+
+export const resolveFromUrlResponseOrbisSchema = z.object({
+  provider: z.literal("orbis"),
+  resourceId: z.string(),
+  slug: z.string(),
+});
+
+export const resolveFromUrlResponseSchema = z.discriminatedUnion("provider", [
+  resolveFromUrlResponseCurseForgeSchema,
+  resolveFromUrlResponseOrbisSchema,
+]);
 
 export type ResolveFromUrlResponse = z.infer<typeof resolveFromUrlResponseSchema>;
 
@@ -131,6 +145,24 @@ export const downloadResponseSchema = z.object({
 });
 
 export type DownloadResponse = z.infer<typeof downloadResponseSchema>;
+
+// --- Installed mod (local DB) ---
+
+export const installedModSchema = z.object({
+  id: z.number().int().optional(), // row id
+  provider: z.enum(["curseforge", "orbis"]),
+  projectId: z.number().int().nullable().optional(), // CurseForge
+  resourceId: z.string().nullable().optional(), // Orbis
+  slug: z.string(),
+  name: z.string(),
+  installedFileId: z.union([z.number().int(), z.string()]).nullable().optional(), // CF fileId or Orbis "versionId:fileIndex"
+  installedFilename: z.string(),
+  installedAt: z.string(), // ISO timestamp
+  sourceUrl: z.string().url().optional(),
+  enabled: z.boolean(),
+});
+
+export type InstalledMod = z.infer<typeof installedModSchema>;
 
 // --- Error ---
 
