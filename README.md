@@ -33,14 +33,16 @@ bun install
 
 ## Running the proxy
 
+From the repo root:
+
 ```bash
-bun run --cwd apps/proxy dev
+bun run dev:proxy
 ```
 
-Or from root (after `bun install`):
+Or from the proxy app directory:
 
 ```bash
-bun run dev --cwd apps/proxy
+bun run --cwd apps/proxy dev
 ```
 
 The API runs at `http://localhost:8787` by default. Try: [http://localhost:8787/health](http://localhost:8787/health) → `{ "ok": true }`.
@@ -49,11 +51,13 @@ Copy `apps/proxy/.env.example` to `apps/proxy/.env` and set `CURSEFORGE_API_KEY`
 
 ## Running the desktop app
 
+From the repo root:
+
 ```bash
-bun run --cwd apps/desktop dev
+bun run dev
 ```
 
-This starts the Vite dev server and opens the Tauri window. Copy `apps/desktop/.env.example` to `apps/desktop/.env` and set `VITE_PROXY_BASE_URL` if you use the proxy (e.g. `http://localhost:8787`).
+Or `bun run dev:desktop`. This starts the Vite dev server and opens the Tauri window. Build the shared package once if needed: `bun run build --cwd packages/shared`. Copy `apps/desktop/.env.example` to `apps/desktop/.env` and set `VITE_PROXY_BASE_URL` if you use the proxy (e.g. `http://localhost:8787`).
 
 ## Running both together
 
@@ -70,7 +74,9 @@ This runs the proxy and the desktop app in parallel (proxy + Tauri dev).
 | Command              | Description                          |
 |----------------------|--------------------------------------|
 | `bun run dev:all`    | Run proxy + desktop (from root)      |
-| `bun run dev`        | Run dev in current app               |
+| `bun run dev`        | Run desktop app (from root)          |
+| `bun run dev:proxy`  | Run proxy only (from root)           |
+| `bun run dev:desktop`| Run desktop only (from root)         |
 | `bun run build`      | Build current app / all workspaces  |
 | `bun run lint`       | Lint (root or per package)          |
 | `bun run format`     | Format with Prettier                |
