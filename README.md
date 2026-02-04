@@ -1,81 +1,87 @@
 # HygherTales
 
-**Hytale-only** mod launcher: cross-platform desktop app for browsing and managing Hytale mods from CurseForge and Orbis.place, and optionally launching a legally installed Hytale client.
+Mod launcher for Hytale. Browse and install mods from CurseForge and Orbis.place, manage profiles, and optionally launch the game.
 
-## Prerequisites
+## What it does
 
-- **Bun** – [Install Bun](https://bun.sh)
-- **Rust toolchain** – For Tauri desktop app: [rustup](https://rustup.rs) (includes `cargo`)
+- Browse mods from CurseForge and Orbis.place
+- Download and install mods to your Hytale Mods folder
+- Enable/disable mods and check for updates
+- Create profiles to switch mod sets
+- Export/import profiles as JSON
+- Launch Hytale (optional, requires legally installed game)
 
-Optional for desktop packaging:
+## What it does not do
 
-- **Linux**: `webkit2gtk`, `libappindicator`, etc. (see [Tauri docs](https://v2.tauri.app/start/install/))
-- **macOS**: Xcode Command Line Tools
-- **Windows**: Visual Studio Build Tools, WebView2
-
-## Repository structure
-
-```
-apps/
-  desktop/   # Tauri v2 + React + Vite
-  proxy/     # Bun + Hono API (CurseForge + Orbis)
-packages/
-  shared/    # TypeScript + Zod schemas and types
-```
-
-## Setup
-
-From the repo root:
-
-```bash
-bun install
-```
+- No game files included or downloaded
+- No authentication bypass
+- No DRM circumvention
 
 ---
 
-## Running locally (Bun)
+## Prerequisites
 
-### Proxy (required for CurseForge)
+- [Bun](https://bun.sh) - JavaScript runtime
+- [Rust](https://rustup.rs) - for desktop builds
 
-From the repo root:
+Linux desktop builds require: `webkit2gtk-4.1-dev`, `libappindicator3-dev`, `librsvg2-dev`, `patchelf`
+
+---
+
+## Quick start
+
+```bash
+bun install
+bun run dev:all
+```
+
+Before running:
+
+1. `cp apps/proxy/.env.example apps/proxy/.env`
+2. Set `CURSEFORGE_API_KEY` (get from [CurseForge](https://support.curseforge.com/en/support/solutions/articles/9000208346))
+3. Set `CURSEFORGE_GAME_ID=70216` (Hytale)
+
+The proxy runs at `http://localhost:8787` and the desktop opens automatically.
+
+---
+
+## Development
+
+**Proxy only:**
 
 ```bash
 bun run dev:proxy
 ```
 
-The API runs at `http://localhost:8787` by default. [http://localhost:8787/health](http://localhost:8787/health) → `{ "ok": true }`.
-
-Copy `apps/proxy/.env.example` to `apps/proxy/.env` and set `CURSEFORGE_API_KEY` and `CURSEFORGE_GAME_ID` (Hytale’s CurseForge game ID). See [apps/proxy/README.md](apps/proxy/README.md) for how to get an API key and the game ID.
-
-### Desktop app
-
-From the repo root:
+**Desktop only:**
 
 ```bash
 bun run dev
 ```
 
-Or `bun run dev:desktop`. Copy `apps/desktop/.env.example` to `apps/desktop/.env` and set `VITE_PROXY_BASE_URL` (e.g. `http://localhost:8787`) so the app talks to your proxy.
-
-### Both together
+**Build all:**
 
 ```bash
-bun run dev:all
+bun run build
 ```
 
-Runs proxy and desktop in parallel.
+**Lint:**
+
+```bash
+bun run lint
+```
 
 ---
 
-## Running the proxy in Docker
+## Docker (proxy)
 
-Build from the **repo root**:
+Build from repo root:
 
 ```bash
 docker build -f apps/proxy/Dockerfile -t hyghertales-proxy .
 ```
 
-Run (pass API key and game ID at runtime; never bake secrets into the image):
+Run (secrets via env):
 
 ```bash
 docker run -p 8787:8787 \
@@ -84,50 +90,54 @@ docker run -p 8787:8787 \
   hyghertales-proxy
 ```
 
-See [apps/proxy/README.md](apps/proxy/README.md) for all env vars (`CORS_ORIGINS`, `RATE_LIMIT_PER_MIN`, etc.).
+Optional env: `CORS_ORIGINS`, `RATE_LIMIT_PER_MIN`, `PORT`. See [apps/proxy/README.md](apps/proxy/README.md).
 
 ---
 
-## Pointing the desktop to a hosted proxy
+## Using a hosted proxy
 
-If the proxy runs elsewhere (e.g. your own server or a team deployment):
+If you deploy the proxy to a server:
 
-1. In the desktop app, open **Settings**.
-2. Set **Proxy base URL** to your proxy URL (e.g. `https://proxy.example.com`).
-3. Ensure the proxy’s `CORS_ORIGINS` includes the origin of the desktop app (for Tauri that may be a custom scheme or `null`; test from the app).
+1. Desktop app → Settings → Proxy base URL → `https://proxy.example.com`
+2. Ensure proxy's `CORS_ORIGINS` allows desktop requests
 
-The desktop app never stores or sends API keys; all CurseForge requests go through the proxy, which holds the key on the server only. See [SECURITY.md](SECURITY.md).
+The desktop never has the API key. All CurseForge calls go through the proxy.
 
-## Scripts
+---
 
-| Command               | Description                           |
-|-----------------------|---------------------------------------|
-| `bun run dev:all`     | Run proxy + desktop (from root)       |
-| `bun run dev`         | Run desktop app (from root)           |
-| `bun run dev:proxy`   | Run proxy only (from root)            |
-| `bun run dev:desktop` | Run desktop only (from root)          |
-| `bun run build`       | Build shared, proxy, and desktop      |
-| `bun run lint`        | Lint (root or per package)            |
-| `bun run format`      | Format with Prettier                  |
+## Troubleshooting
+
+**Proxy returns 403:**  
+Missing or invalid `CURSEFORGE_API_KEY`. Get a key from CurseForge (see [apps/proxy/README.md](apps/proxy/README.md)).
+
+**Desktop can't reach proxy:**  
+Check Settings → Proxy base URL. Default is `http://localhost:8787`.
+
+**Mods folder permission denied:**  
+Desktop can't write to the Mods directory. Use Settings → Validate to create it or check permissions.
+
+---
 
 ## Distribution
 
-- **Releases**: [release-please](https://github.com/googleapis/release-please) manages version bumps and GitHub releases. Merging the automated release PR creates a tag and triggers CI.
-- **CI** (`.github/workflows/release-please.yml`): Builds the Tauri desktop app for **Windows**, **macOS**, and **Linux**, and builds the proxy **Docker** image; artifacts are attached to the release. No secrets are stored in the desktop bundle; the proxy expects `CURSEFORGE_API_KEY` only on the server (env or Docker).
+Release-please manages versions and releases. CI builds:
+- Desktop installers (Windows `.msi`, macOS `.dmg`, Linux `.deb`/`.AppImage`)
+- Proxy Docker image
 
-## Environment templates
+See [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) for deployment steps.
 
-- **apps/proxy/.env.example** – `CURSEFORGE_API_KEY`, `PORT`, optional `CURSEFORGE_GAME_ID`, `CORS_ORIGINS`, `RATE_LIMIT_PER_MIN`
-- **apps/desktop/.env.example** – `VITE_PROXY_BASE_URL`
+---
 
-## Tech stack
+## Repository structure
 
-- **Monorepo**: Bun workspaces
-- **Desktop**: Tauri v2, TypeScript, React, Vite
-- **Proxy API**: Bun, TypeScript, Hono (CurseForge + Orbis.place, **Hytale mods only**)
-- **Shared**: TypeScript, Zod (schemas and types)
-- **Tooling**: ESLint, Prettier (root config), TypeScript (base + references)
+```
+apps/
+  desktop/   # Tauri v2 + React + Vite + Tailwind v4
+  proxy/     # Bun + Hono (CurseForge + Orbis.place APIs)
+packages/
+  shared/    # TypeScript + Zod (schemas and types)
+```
 
-## Legal
+## License
 
-This project does not include any pirated or illegal game files. It does not provide auth bypass or DRM bypass. The app is a **Hytale** mod launcher and can optionally launch a legally installed Hytale client.
+See [LICENSE](LICENSE).

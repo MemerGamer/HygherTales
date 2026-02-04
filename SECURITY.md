@@ -1,29 +1,32 @@
-# Security checklist
+# Security
 
-## API key only on server
+## API key isolation
 
-- **CurseForge API key** is used **only** by the proxy server (`apps/proxy`). It is read from the server environment (e.g. `CURSEFORGE_API_KEY` in `.env` or Docker `-e`).
-- The **desktop app** never receives, stores, or sends the API key. All CurseForge requests from the desktop go through the proxy; the proxy adds the key server-side.
-- **Distribution**: Desktop builds (Windows/macOS/Linux) do not bundle any API keys or secrets. Users configure the proxy URL in Settings; the key stays on the machine running the proxy.
+- **CurseForge API key** lives only on the proxy server (env var or Docker secret)
+- Desktop never receives, stores, or transmits the API key
+- Desktop builds contain no secrets
+- Users configure proxy URL in Settings; key stays on the proxy server
 
-## Rate limiting on proxy
+## Rate limiting
 
-- The proxy applies **per-IP rate limiting** (configurable via `RATE_LIMIT_PER_MIN`, default 60 requests/minute). This reduces abuse and keeps usage within CurseForge API expectations.
-- Rate limiting is applied before route handlers. When exceeded, the proxy returns `429` with `RATE_LIMITED`; no API key is ever included in responses.
+- Proxy enforces per-IP rate limits (default: 60 req/min, configurable via `RATE_LIMIT_PER_MIN`)
+- Prevents abuse and keeps usage within CurseForge API limits
+- Returns `429` when exceeded; no key in responses
 
-## Minimal logging, no key leakage
+## Logging
 
-- The proxy does **not** log the API key or any request/response bodies that could contain secrets.
-- Startup logging is minimal (e.g. port only). No env vars are printed or logged.
-- Error responses use generic messages; internal details (e.g. CurseForge error bodies) are not logged in a way that could expose the key.
+- Proxy does not log API keys or sensitive data
+- Startup message logs port only
+- Error responses are generic; no CurseForge internals exposed
 
-## Best practices for deployers
+## Deployment best practices
 
-- Run the proxy in a restricted environment (e.g. container or dedicated user) and expose only the port you need.
-- Use HTTPS and appropriate `CORS_ORIGINS` when the desktop or a web client talks to a hosted proxy.
-- Keep `CURSEFORGE_API_KEY` in a secret store (e.g. GitHub Actions secrets, Docker secrets, or env files with restricted permissions); never commit it or bake it into images.
-- Prefer building the proxy Docker image without secrets and passing `CURSEFORGE_API_KEY` at `docker run` (or via your orchestrator’s secret mechanism).
+- Run proxy in container or isolated environment
+- Use HTTPS for production deployments
+- Set `CORS_ORIGINS` appropriately
+- Store `CURSEFORGE_API_KEY` in secret manager (GitHub Actions secrets, Docker secrets, env files with restricted permissions)
+- Never commit secrets or bake them into images
 
 ## Reporting issues
 
-If you find a security concern, please open a GitHub issue or contact the maintainers privately; avoid posting secrets or detailed exploit steps in public issues.
+Open a GitHub issue for security concerns. Avoid posting secrets or exploit details publicly.
