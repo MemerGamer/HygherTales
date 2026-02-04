@@ -56,7 +56,12 @@ function App() {
 
       {/* Main content */}
       <main className="relative z-20 flex-1 overflow-auto">
-        {page === "home" && <Home gameExePath={settings.gameExePath} />}
+        {page === "home" && (
+          <Home
+            gameExePath={settings.gameExePath}
+            onNavigate={(nextPage) => setPage(nextPage)}
+          />
+        )}
         {page === "browse" && (
           <Browse
             proxyBaseUrl={settings.proxyBaseUrl}

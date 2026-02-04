@@ -23,7 +23,7 @@ import { loadBrowseSource, saveBrowseSource } from "../lib/settings";
 import { openExternalUrl } from "../lib/shell";
 import type { ModSummary, ModCategory, ModDetailsResponse, ModFile } from "@hyghertales/shared";
 import { PageContainer } from "../components/layout/PageContainer";
-import { Button, Input, Card, Modal, Spinner } from "../components/ui";
+import { Button, Input, Select, Card, Modal, Spinner } from "../components/ui";
 
 /** Parse description that may be Markdown, HTML, or both. Returns HTML string. */
 function parseDescriptionToHtml(description: string): string {
@@ -285,98 +285,142 @@ export function Browse({ proxyBaseUrl, modsDirPath }: BrowseProps) {
       ? `https://www.orbis.place/mod/${mod.slug}`
       : "";
 
-  const selectStyles =
-    "px-3 py-2 bg-[rgba(255,255,255,0.1)] border border-[var(--color-border)] rounded text-[var(--color-text)] transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#1a1a1a] focus:ring-[rgba(100,160,100,0.6)] disabled:opacity-60 disabled:cursor-not-allowed";
-
   return (
     <PageContainer title="Browse mods">
       {/* Search and filter toolbar */}
-      <div className="flex flex-wrap gap-2 mb-6">
-        <select
-          aria-label="Mod source"
-          value={source}
-          onChange={(e) => {
-            const next = e.target.value as ModSource;
-            setSource(next);
-            saveBrowseSource(next);
-          }}
-          disabled={loading}
-          className={selectStyles}
-        >
-          <option value="curseforge">CurseForge</option>
-          <option value="orbis">Orbis.place</option>
-        </select>
-        <Input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && doSearch()}
-          placeholder={source === "orbis" ? "Search Orbis.place mods…" : "Search CurseForge mods…"}
-          disabled={loading}
-          aria-label="Search mods"
-          className="flex-1 min-w-[200px]"
-        />
-        {source === "curseforge" && (
-          <>
-            <select
-              aria-label="Category"
-              value={categoryId || ""}
-              onChange={(e) => setCategoryId(Number(e.target.value) || 0)}
-              disabled={loading}
-              className={selectStyles}
-            >
-              <option value="">All categories</option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
-                </option>
-              ))}
-            </select>
-            <select
-              aria-label="Sort by"
-              value={sortField}
-              onChange={(e) => setSortField(Number(e.target.value))}
-              disabled={loading}
-              className={selectStyles}
-            >
-              {SORT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-            <select
-              aria-label="Sort order"
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value as "asc" | "desc")}
-              disabled={loading}
-              className={selectStyles}
-            >
-              <option value="desc">Descending</option>
-              <option value="asc">Ascending</option>
-            </select>
-          </>
-        )}
-        {source === "orbis" && (
-          <select
-            aria-label="Sort by"
-            value={orbisSortBy}
-            onChange={(e) =>
-              setOrbisSortBy(e.target.value as "date" | "downloads" | "name")
-            }
+      <div className="space-y-3 mb-6">
+        {/* Search row */}
+        <div className="flex gap-2">
+          <Input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && doSearch()}
+            placeholder={source === "orbis" ? "Search Orbis.place mods…" : "Search CurseForge mods…"}
             disabled={loading}
-            className={selectStyles}
-          >
-            {ORBIS_SORT_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        )}
-        <Button onClick={doSearch} disabled={loading}>
-          {loading ? "Loading…" : "Search"}
-        </Button>
+            aria-label="Search mods"
+            className="flex-1"
+          />
+          <Button onClick={doSearch} disabled={loading}>
+            {loading ? "Loading…" : "Search"}
+          </Button>
+        </div>
+
+        {/* Filters row */}
+        <div className="flex flex-wrap gap-3 items-center">
+          {/* Source toggle as segmented control */}
+          <div className="flex gap-1 bg-[rgba(255,255,255,0.05)] border border-[var(--color-border)] rounded p-1">
+            <button
+              type="button"
+              onClick={() => {
+                setSource("curseforge");
+                saveBrowseSource("curseforge");
+              }}
+              disabled={loading}
+              className={`px-3 h-8 text-sm rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(100,160,100,0.6)] disabled:opacity-60 ${
+                source === "curseforge"
+                  ? "bg-[var(--color-primary)] text-white font-medium"
+                  : "text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+              }`}
+            >
+              CurseForge
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSource("orbis");
+                saveBrowseSource("orbis");
+              }}
+              disabled={loading}
+              className={`px-3 h-8 text-sm rounded transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(100,160,100,0.6)] disabled:opacity-60 ${
+                source === "orbis"
+                  ? "bg-[var(--color-primary)] text-white font-medium"
+                  : "text-[var(--color-text-muted)] hover:text-[var(--color-text)]"
+              }`}
+            >
+              Orbis.place
+            </button>
+          </div>
+
+          {/* Divider */}
+          <div className="h-6 w-px bg-[var(--color-border)]" aria-hidden="true" />
+
+          {/* CurseForge filters */}
+          {source === "curseforge" && (
+            <>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-[var(--color-text-muted)]">Category:</span>
+                <Select
+                  aria-label="Category"
+                  value={categoryId || ""}
+                  onChange={(e) => setCategoryId(Number(e.target.value) || 0)}
+                  disabled={loading}
+                  size="sm"
+                  className="min-w-[140px]"
+                >
+                  <option value="">All</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-[var(--color-text-muted)]">Sort:</span>
+                <Select
+                  aria-label="Sort by"
+                  value={sortField}
+                  onChange={(e) => setSortField(Number(e.target.value))}
+                  disabled={loading}
+                  size="sm"
+                  className="min-w-[120px]"
+                >
+                  {SORT_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </Select>
+                <Select
+                  aria-label="Sort order"
+                  value={sortOrder}
+                  onChange={(e) => setSortOrder(e.target.value as "asc" | "desc")}
+                  disabled={loading}
+                  size="sm"
+                  className="w-[100px]"
+                >
+                  <option value="desc">Desc</option>
+                  <option value="asc">Asc</option>
+                </Select>
+              </div>
+            </>
+          )}
+
+          {/* Orbis filters */}
+          {source === "orbis" && (
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-[var(--color-text-muted)]">Sort:</span>
+              <Select
+                aria-label="Sort by"
+                value={orbisSortBy}
+                onChange={(e) =>
+                  setOrbisSortBy(e.target.value as "date" | "downloads" | "name")
+                }
+                disabled={loading}
+                size="sm"
+                className="min-w-[110px]"
+              >
+                {ORBIS_SORT_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Error banner */}
@@ -481,7 +525,7 @@ export function Browse({ proxyBaseUrl, modsDirPath }: BrowseProps) {
             )}
             {detail.description && (
               <div
-                className="prose prose-invert prose-sm max-w-none overflow-y-auto max-h-[40vh] text-[var(--color-text)] [&_a]:text-[#7eb8ff] [&_a:hover]:text-[#a8d4ff] [&_strong]:text-white [&_h1]:text-white [&_h2]:text-white [&_h3]:text-white [&_h4]:text-white [&_code]:bg-black/30 [&_code]:px-1 [&_code]:rounded [&_pre]:bg-black/30 [&_pre]:p-3 [&_blockquote]:border-l-white/30"
+                className="prose prose-invert prose-sm max-w-none overflow-y-auto max-h-[40vh] p-4 bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded text-[#f5f5f5] [&_a]:text-[#7eb8ff] [&_a:hover]:text-[#a8d4ff] [&_strong]:text-white [&_h1]:text-white [&_h2]:text-white [&_h3]:text-white [&_h4]:text-white [&_code]:bg-black/40 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_pre]:bg-black/40 [&_pre]:p-3 [&_blockquote]:border-l-white/40"
                 dangerouslySetInnerHTML={{
                   __html: parseDescriptionToHtml(detail.description),
                 }}
@@ -502,7 +546,7 @@ export function Browse({ proxyBaseUrl, modsDirPath }: BrowseProps) {
                     return (
                       <div
                         key={key}
-                        className="flex flex-wrap items-center gap-2 p-3 bg-[rgba(255,255,255,0.05)] rounded"
+                        className="flex flex-wrap items-center gap-2 p-3 bg-[var(--color-surface-elevated)] border border-[var(--color-border)] rounded"
                       >
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium text-white truncate">

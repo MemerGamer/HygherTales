@@ -1,6 +1,14 @@
 # HygherTales
 
+![HygherTales](./home.png)
+
 Mod launcher for Hytale. Browse and install mods from CurseForge and Orbis.place, manage profiles, and optionally launch the game.
+
+## DISCLAIMER
+
+- This project is not affiliated with Hypixel or Hytale.
+- The project is still in development and is not yet ready for use.
+- The project was developed using AI agents
 
 ## What it does
 

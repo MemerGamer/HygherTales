@@ -4,6 +4,7 @@
   /* Dark glassmorphism theme matching current design */
   --color-surface: rgba(0, 0, 0, 0.5);
   --color-surface-hover: rgba(255, 255, 255, 0.1);
+  --color-surface-elevated: rgba(255, 255, 255, 0.08);
   --color-border: rgba(255, 255, 255, 0.15);
   --color-text: #eee;
   --color-text-muted: rgba(255, 255, 255, 0.6);
