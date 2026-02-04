@@ -134,6 +134,33 @@ Resolve a CurseForge (or other) mod page URL to a canonical provider + projectId
 
 ---
 
+## Download (helper)
+
+**GET** `/v1/download/:projectId/:fileId`
+
+Returns a temporary download URL for a mod file. The desktop app can use this without the CurseForge API key. Do not log full URLs; they may contain tokens.
+
+### Response: `DownloadResponse`
+
+```json
+{
+  "url": "https://edge.forgecdn.net/files/1234/567/mod.jar"
+}
+```
+
+### Error: `DOWNLOAD_NOT_AVAILABLE` (503)
+
+When CurseForge does not provide a URL (e.g. distribution blocked or file not accessible):
+
+```json
+{
+  "code": "DOWNLOAD_NOT_AVAILABLE",
+  "message": "Download URL is not available for this file (CurseForge may block distribution or the file is not accessible)."
+}
+```
+
+---
+
 ## Error
 
 Any endpoint may return an error payload with a 4xx/5xx status.

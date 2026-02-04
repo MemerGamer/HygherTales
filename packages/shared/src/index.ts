@@ -17,6 +17,8 @@ export {
   type ResolveFromUrlRequest,
   resolveFromUrlResponseSchema,
   type ResolveFromUrlResponse,
+  downloadResponseSchema,
+  type DownloadResponse,
   errorResponseSchema,
   type ErrorResponse,
 } from "./schemas.js";

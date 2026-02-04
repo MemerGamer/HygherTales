@@ -81,6 +81,14 @@ export const resolveFromUrlResponseSchema = z.object({
 
 export type ResolveFromUrlResponse = z.infer<typeof resolveFromUrlResponseSchema>;
 
+// --- Download ---
+
+export const downloadResponseSchema = z.object({
+  url: z.string().url(),
+});
+
+export type DownloadResponse = z.infer<typeof downloadResponseSchema>;
+
 // --- Error ---
 
 export const errorResponseSchema = z.object({

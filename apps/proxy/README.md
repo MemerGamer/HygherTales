@@ -38,6 +38,7 @@ bun run start
 - `GET /v1/mod/:projectId` — Mod details.
 - `GET /v1/mod/:projectId/files` — Mod files.
 - `POST /v1/resolve-from-url` — Body `{ "url": "..." }`; parses CurseForge mod URL and resolves to provider/projectId/slug (requires `CURSEFORGE_GAME_ID`).
+- `GET /v1/download/:projectId/:fileId` — Returns JSON `{ "url": string }` (temporary download URL). Use this so the desktop app never needs the API key. Returns `503` with code `DOWNLOAD_NOT_AVAILABLE` when CurseForge does not provide a URL.
 
 Request/response shapes are defined and validated with `@hyghertales/shared`; see `packages/shared/API.md` for examples.
 
@@ -49,4 +50,4 @@ Errors are returned as `{ "code": string, "message": string, "details"?: unknown
 bun test src
 ```
 
-Covers URL parsing (resolve-from-url), TTL cache behaviour, and pure mappers from upstream CurseForge shapes to shared types.
+Covers URL parsing (resolve-from-url), TTL cache behaviour, pure mappers, and the download endpoint (param validation, DOWNLOAD_NOT_AVAILABLE when URL is unavailable).

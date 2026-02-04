@@ -5,6 +5,7 @@ import health from "./routes/health.js";
 import { createSearchRoutes } from "./routes/search.js";
 import { createModRoutes } from "./routes/mod.js";
 import { createResolveRoutes } from "./routes/resolve.js";
+import { createDownloadRoutes } from "./routes/download.js";
 import { createCurseForgeClient } from "./lib/curseforge.js";
 import { createRateLimitMiddleware } from "./lib/rateLimit.js";
 import { AppError } from "./lib/errors.js";
@@ -39,9 +40,10 @@ app.route("/health", health);
 app.route("/v1/search", createSearchRoutes(cf));
 app.route("/v1/mod", createModRoutes(cf));
 app.route("/v1/resolve-from-url", createResolveRoutes(cf));
+app.route("/v1/download", createDownloadRoutes(cf));
 
 // Central error handler: return ErrorResponse consistently
-type HttpStatus = 400 | 404 | 500;
+type HttpStatus = 400 | 404 | 500 | 503;
 app.onError((err, c) => {
   if (err instanceof AppError) {
     const body = errorResponseSchema.parse(err.toJSON());
