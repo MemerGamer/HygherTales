@@ -1,10 +1,13 @@
 const PORT_DEFAULT = 8787;
 
+const RATE_LIMIT_PER_MIN_DEFAULT = 60;
+
 function getEnv(): {
   CURSEFORGE_API_KEY: string;
   PORT: number;
   CURSEFORGE_GAME_ID: number | undefined;
   CORS_ORIGINS: string[];
+  RATE_LIMIT_PER_MIN: number;
 } {
   const key = Bun.env.CURSEFORGE_API_KEY;
   if (!key || key.trim() === "") {
@@ -40,11 +43,23 @@ function getEnv(): {
       ? corsRaw.split(",").map((s) => s.trim()).filter(Boolean)
       : ["http://localhost:1420", "http://localhost:5173", "http://localhost:3000"];
 
+  const rateLimitRaw = Bun.env.RATE_LIMIT_PER_MIN;
+  const RATE_LIMIT_PER_MIN =
+    rateLimitRaw != null && rateLimitRaw !== ""
+      ? Number(rateLimitRaw)
+      : RATE_LIMIT_PER_MIN_DEFAULT;
+  if (Number.isNaN(RATE_LIMIT_PER_MIN) || RATE_LIMIT_PER_MIN < 1) {
+    throw new Error(
+      `Invalid RATE_LIMIT_PER_MIN: ${rateLimitRaw}. Default is ${RATE_LIMIT_PER_MIN_DEFAULT}.`
+    );
+  }
+
   return {
     CURSEFORGE_API_KEY: key.trim(),
     PORT: port,
     CURSEFORGE_GAME_ID,
     CORS_ORIGINS,
+    RATE_LIMIT_PER_MIN,
   };
 }
 

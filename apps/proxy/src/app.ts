@@ -6,12 +6,16 @@ import { createSearchRoutes } from "./routes/search.js";
 import { createModRoutes } from "./routes/mod.js";
 import { createResolveRoutes } from "./routes/resolve.js";
 import { createCurseForgeClient } from "./lib/curseforge.js";
+import { createRateLimitMiddleware } from "./lib/rateLimit.js";
 import { AppError } from "./lib/errors.js";
 import { env } from "./lib/env.js";
 
 const cf = createCurseForgeClient(env.CURSEFORGE_API_KEY, env.CURSEFORGE_GAME_ID);
 
 const app = new Hono();
+
+// Per-IP rate limit (configurable via RATE_LIMIT_PER_MIN)
+app.use("*", createRateLimitMiddleware(env.RATE_LIMIT_PER_MIN));
 
 // CORS: allowlist from env (defaults include localhost for desktop dev)
 app.use(
