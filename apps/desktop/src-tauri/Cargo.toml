@@ -1,0 +1,23 @@
+[package]
+name = "hyghertales-desktop"
+version = "0.0.1"
+description = "HygherTales desktop app"
+authors = ["HygherTales"]
+license = ""
+repository = ""
+edition = "2021"
+rust-version = "1.70"
+
+[lib]
+name = "app_lib"
+path = "src/lib.rs"
+
+[[bin]]
+name = "hyghertales-desktop"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
