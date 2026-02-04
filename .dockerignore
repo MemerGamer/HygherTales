@@ -1,0 +1,27 @@
+# Git and CI
+.git
+.github
+.release-please*
+
+# Desktop app (not needed for proxy image)
+apps/desktop
+
+# Build outputs and caches
+**/node_modules
+**/dist
+**/target
+*.tsbuildinfo
+
+# Env and local config (secrets stay on host)
+.env
+.env.*
+
+# Docs and dev
+*.md
+!apps/proxy/README.md
+
+# Tests and tooling
+**/*.test.ts
+**/*.spec.ts
+.eslint*
+.prettier*

@@ -48,6 +48,44 @@ bun run build
 bun run start
 ```
 
+## Docker
+
+Build from the **repository root** (monorepo context):
+
+```bash
+docker build -f apps/proxy/Dockerfile -t hyghertales-proxy .
+```
+
+Run with env vars (no secrets in the image):
+
+```bash
+docker run -p 8787:8787 \
+  -e CURSEFORGE_API_KEY=your_key \
+  -e CURSEFORGE_GAME_ID=70216 \
+  hyghertales-proxy
+```
+
+**Env vars for Docker (same as table above):**
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `CURSEFORGE_API_KEY` | **Yes** | — | CurseForge API key. Set only at runtime; never baked into the image. |
+| `CURSEFORGE_GAME_ID` | **Yes for search/featured** | — | Hytale’s CurseForge game ID (e.g. `70216`). |
+| `PORT` | No | `8787` | Port the container listens on (map with `-p`). |
+| `CORS_ORIGINS` | No | localhost dev origins | Comma-separated allowed origins. |
+| `RATE_LIMIT_PER_MIN` | No | `60` | Per-IP rate limit (requests per minute). |
+
+Example with CORS and rate limit:
+
+```bash
+docker run -p 8787:8787 \
+  -e CURSEFORGE_API_KEY=xxx \
+  -e CURSEFORGE_GAME_ID=70216 \
+  -e CORS_ORIGINS=https://myapp.com,https://desktop.local \
+  -e RATE_LIMIT_PER_MIN=120 \
+  hyghertales-proxy
+```
+
 ## API (Hytale mods only)
 
 All `/v1/*` endpoints that call CurseForge use **only** the API key from `CURSEFORGE_API_KEY` in the proxy `.env`.

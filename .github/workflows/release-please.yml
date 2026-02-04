@@ -1,0 +1,184 @@
+name: release-please
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: "googleapis/release-please-action@v4"
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  build-windows:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: windows-latest
+    steps:
+      - uses: "actions/checkout@v4"
+
+      - name: Setup Bun
+        uses: "oven-sh/setup-bun@v2"
+
+      - name: Install Rust
+        uses: "dtolnay/rust-toolchain@stable"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build shared package
+        run: bun run build --cwd packages/shared
+
+      - name: Sync version to Tauri
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          $tauri = Get-Content apps/desktop/src-tauri/tauri.conf.json | ConvertFrom-Json
+          $tauri.version = $version
+          $tauri | ConvertTo-Json -Depth 10 | Set-Content apps/desktop/src-tauri/tauri.conf.json
+        shell: pwsh
+
+      - name: Build desktop (Windows)
+        run: bun run build --cwd apps/desktop
+
+      - name: Upload Windows artifacts to release
+        run: |
+          $tag = "${{ needs.release-please.outputs.tag_name }}"
+          $bundle = "apps/desktop/src-tauri/target/release/bundle"
+          if (Test-Path $bundle) {
+            Get-ChildItem -Path $bundle -Recurse -File | ForEach-Object { gh release upload $tag $_.FullName }
+          }
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-macos:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: macos-latest
+    steps:
+      - uses: "actions/checkout@v4"
+
+      - name: Setup Bun
+        uses: "oven-sh/setup-bun@v2"
+
+      - name: Install Rust
+        uses: "dtolnay/rust-toolchain@stable"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build shared package
+        run: bun run build --cwd packages/shared
+
+      - name: Sync version to Tauri
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          node -e "
+            const fs = require('fs');
+            const path = 'apps/desktop/src-tauri/tauri.conf.json';
+            const c = JSON.parse(fs.readFileSync(path, 'utf8'));
+            c.version = process.env.VERSION;
+            fs.writeFileSync(path, JSON.stringify(c, null, 2));
+          "
+
+      - name: Build desktop (macOS)
+        run: bun run build --cwd apps/desktop
+
+      - name: Upload macOS artifacts to release
+        run: |
+          TAG="${{ needs.release-please.outputs.tag_name }}"
+          BUNDLE="apps/desktop/src-tauri/target/release/bundle"
+          find "$BUNDLE" -type f \( -name "*.dmg" -o -name "*.app.tar.gz" -o -name "*.app.tar.gz.sig" \) -exec gh release upload "$TAG" {} \;
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-linux:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: "actions/checkout@v4"
+
+      - name: Mark repo as safe for git
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git config --global --add safe.directory "$(pwd)"
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Setup Bun
+        uses: "oven-sh/setup-bun@v2"
+
+      - name: Install Rust
+        uses: "dtolnay/rust-toolchain@stable"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build shared package
+        run: bun run build --cwd packages/shared
+
+      - name: Sync version to Tauri
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          node -e "
+            const fs = require('fs');
+            const path = 'apps/desktop/src-tauri/tauri.conf.json';
+            const c = JSON.parse(fs.readFileSync(path, 'utf8'));
+            c.version = process.env.VERSION;
+            fs.writeFileSync(path, JSON.stringify(c, null, 2));
+          "
+
+      - name: Build desktop (Linux)
+        run: bun run build --cwd apps/desktop
+
+      - name: Upload Linux artifacts to release
+        run: |
+          TAG="${{ needs.release-please.outputs.tag_name }}"
+          BUNDLE="apps/desktop/src-tauri/target/release/bundle"
+          find "$BUNDLE" -type f \( -name "*.deb" -o -name "*.AppImage" -o -name "*.AppImage.tar.gz" -o -name "*.AppImage.tar.gz.sig" \) -exec gh release upload "$TAG" {} \;
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-proxy-docker:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: "actions/checkout@v4"
+
+      - name: Set up Docker Buildx
+        uses: "docker/setup-buildx-action@v3"
+
+      - name: Build proxy Docker image
+        uses: "docker/build-push-action@v6"
+        with:
+          context: .
+          file: apps/proxy/Dockerfile
+          push: false
+          load: true
+          tags: "hyghertales-proxy:${{ needs.release-please.outputs.version }}"
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Upload proxy image artifact
+        run: |
+          docker save hyghertales-proxy:${{ needs.release-please.outputs.version }} | gzip > proxy-image.tar.gz
+          gh release upload "${{ needs.release-please.outputs.tag_name }}" proxy-image.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
