@@ -12,9 +12,10 @@ function getEnv(): {
   const key = Bun.env.CURSEFORGE_API_KEY;
   if (!key || key.trim() === "") {
     throw new Error(
-      "CURSEFORGE_API_KEY is required. Set it in .env or the environment."
+      "CURSEFORGE_API_KEY is required. Set it in apps/proxy/.env (see README for how to get a key)."
     );
   }
+  const trimmed = key.trim();
 
   const portRaw = Bun.env.PORT;
   const port = portRaw != null ? Number(portRaw) : PORT_DEFAULT;
@@ -25,15 +26,14 @@ function getEnv(): {
   }
 
   const gameIdRaw = Bun.env.CURSEFORGE_GAME_ID;
+  const parsed = gameIdRaw != null && gameIdRaw.trim() !== "" ? Number(gameIdRaw.trim()) : NaN;
   const CURSEFORGE_GAME_ID =
-    gameIdRaw != null && gameIdRaw !== ""
-      ? Number(gameIdRaw)
-      : undefined;
-  if (
-    CURSEFORGE_GAME_ID !== undefined &&
-    (Number.isNaN(CURSEFORGE_GAME_ID) || CURSEFORGE_GAME_ID < 1)
-  ) {
-    throw new Error(`Invalid CURSEFORGE_GAME_ID: ${gameIdRaw}.`);
+    typeof parsed === "number" && !Number.isNaN(parsed) && parsed >= 1 ? parsed : undefined;
+  if (gameIdRaw != null && gameIdRaw.trim() !== "" && (CURSEFORGE_GAME_ID === undefined)) {
+    throw new Error(
+      `Invalid CURSEFORGE_GAME_ID: "${gameIdRaw}". It must be the numeric game ID (e.g. 12345), not the slug "hytale". ` +
+        "Get the ID with: curl -H \"x-api-key: YOUR_KEY\" \"https://api.curseforge.com/v1/games?pageSize=50\" and use the \"id\" of the game with \"slug\": \"hytale\". See apps/proxy/README.md."
+    );
   }
 
   // Comma-separated allowlist; default allows localhost in dev
@@ -55,7 +55,7 @@ function getEnv(): {
   }
 
   return {
-    CURSEFORGE_API_KEY: key.trim(),
+    CURSEFORGE_API_KEY: trimmed,
     PORT: port,
     CURSEFORGE_GAME_ID,
     CORS_ORIGINS,

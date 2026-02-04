@@ -10,22 +10,57 @@ export type HealthResponse = z.infer<typeof healthResponseSchema>;
 
 // --- Mod search ---
 
+/** sortField: 1=Featured, 2=Popularity, 3=LastUpdated, 4=Name, 5=Author, 6=TotalDownloads (CurseForge API) */
 export const modSearchRequestSchema = z.object({
   q: z.string(),
   page: z.number().int().min(1),
   pageSize: z.number().int().min(1).max(100),
+  categoryId: z.number().int().min(0).optional(),
+  sortField: z.number().int().min(0).max(6).optional(),
+  sortOrder: z.enum(["asc", "desc"]).optional(),
 });
 
 export type ModSearchRequest = z.infer<typeof modSearchRequestSchema>;
 
-export const modSummarySchema = z.object({
-  provider: z.literal("curseforge"),
-  projectId: z.number().int(),
+// --- Categories (for filter dropdown) ---
+
+export const modCategorySchema = z.object({
+  id: z.number().int(),
+  name: z.string(),
+  slug: z.string(),
+});
+
+export type ModCategory = z.infer<typeof modCategorySchema>;
+
+export const modCategoriesResponseSchema = z.object({
+  categories: z.array(modCategorySchema),
+});
+
+export type ModCategoriesResponse = z.infer<typeof modCategoriesResponseSchema>;
+
+const modSummaryBase = {
   slug: z.string(),
   name: z.string(),
   summary: z.string().nullable().optional(),
   logoUrl: z.string().url().nullable().optional(),
+};
+
+export const modSummaryCurseForgeSchema = z.object({
+  provider: z.literal("curseforge"),
+  projectId: z.number().int(),
+  ...modSummaryBase,
 });
+
+export const modSummaryOrbisSchema = z.object({
+  provider: z.literal("orbis"),
+  resourceId: z.string(),
+  ...modSummaryBase,
+});
+
+export const modSummarySchema = z.discriminatedUnion("provider", [
+  modSummaryCurseForgeSchema,
+  modSummaryOrbisSchema,
+]);
 
 export type ModSummary = z.infer<typeof modSummarySchema>;
 
@@ -40,9 +75,17 @@ export type ModSearchResponse = z.infer<typeof modSearchResponseSchema>;
 
 // --- Mod details ---
 
-export const modDetailsResponseSchema = modSummarySchema.extend({
+export const modDetailsResponseCurseForgeSchema =
+  modSummaryCurseForgeSchema.extend({
+    description: z.string().nullable().optional(),
+  });
+export const modDetailsResponseOrbisSchema = modSummaryOrbisSchema.extend({
   description: z.string().nullable().optional(),
 });
+export const modDetailsResponseSchema = z.discriminatedUnion("provider", [
+  modDetailsResponseCurseForgeSchema,
+  modDetailsResponseOrbisSchema,
+]);
 
 export type ModDetailsResponse = z.infer<typeof modDetailsResponseSchema>;
 

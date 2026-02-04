@@ -1,6 +1,6 @@
-# HygherTales Proxy API Contract
+# HygherTales Proxy API Contract (Hytale mods only)
 
-Request/response shapes and examples. All response payloads can be validated with the zod schemas in `@hyghertales/shared`.
+Request/response shapes and examples. All response payloads can be validated with the zod schemas in `@hyghertales/shared`. The proxy serves **Hytale** mods from **CurseForge** and **Orbis.place**.
 
 ---
 
@@ -22,16 +22,20 @@ Liveness check.
 
 ## Mod search
 
-**GET** `/mods/search?q=...&page=1&pageSize=20`  
-(or equivalent POST with body)
+**GET** `/v1/search?q=...&page=1&pageSize=20&categoryId=&sortField=&sortOrder=`
+
+Optional query params (inspired by HyPrism/CurseForge): `categoryId` (filter by category), `sortField` (1=Featured, 2=Popularity, 3=LastUpdated, 4=Name, 5=Author, 6=TotalDownloads), `sortOrder` (`asc` or `desc`).
 
 ### Request: `ModSearchRequest`
 
 ```json
 {
-  "q": "fabric",
+  "q": "potion",
   "page": 1,
-  "pageSize": 20
+  "pageSize": 20,
+  "categoryId": 0,
+  "sortField": 2,
+  "sortOrder": "desc"
 }
 ```
 
@@ -42,11 +46,11 @@ Liveness check.
   "items": [
     {
       "provider": "curseforge",
-      "projectId": 306612,
-      "slug": "fabric-api",
-      "name": "Fabric API",
-      "summary": "Core API for the Fabric toolchain.",
-      "logoUrl": "https://cdn.modrinth.com/..."
+      "projectId": 123456,
+      "slug": "epics-potion-trader",
+      "name": "Epic's Potion Trader",
+      "summary": "A Hytale mod that adds...",
+      "logoUrl": "https://..."
     }
   ],
   "page": 1,
@@ -55,22 +59,61 @@ Liveness check.
 }
 ```
 
+Search/featured responses may also contain **Orbis.place** items (when using `/v1/orbis/featured` or `/v1/orbis/search`). Those items use the same `ModSearchResponse` shape with `provider: "orbis"` and `resourceId` instead of `projectId`:
+
+```json
+{
+  "items": [
+    {
+      "provider": "orbis",
+      "resourceId": "cmkcxg67b000g01s6ewk287pn",
+      "slug": "cleanstaffchat",
+      "name": "CleanStaffChat",
+      "summary": "Clean StaffChat is a basic StaffChat plugin...",
+      "logoUrl": "https://media.orbis.place/..."
+    }
+  ],
+  "page": 1,
+  "pageSize": 20,
+  "totalCount": 68
+}
+```
+
+---
+
+## Mod categories
+
+**GET** `/v1/categories`
+
+Returns Hytale mod categories for the filter dropdown (subcategories under the “Mods” class, as in HyPrism).
+
+### Response: `ModCategoriesResponse`
+
+```json
+{
+  "categories": [
+    { "id": 123, "name": "Quality of Life", "slug": "quality-of-life" },
+    { "id": 456, "name": "Gameplay", "slug": "gameplay" }
+  ]
+}
+```
+
 ---
 
 ## Mod details
 
-**GET** `/mods/:provider/:projectId` or `/mods/:provider/:slug`
+**GET** `/v1/mod/:projectId`
 
 ### Response: `ModDetailsResponse`
 
 ```json
 {
   "provider": "curseforge",
-  "projectId": 306612,
-  "slug": "fabric-api",
-  "name": "Fabric API",
-  "summary": "Core API for the Fabric toolchain.",
-  "logoUrl": "https://cdn.modrinth.com/...",
+  "projectId": 123456,
+  "slug": "epics-potion-trader",
+  "name": "Epic's Potion Trader",
+  "summary": "A Hytale mod that adds...",
+  "logoUrl": "https://...",
   "description": "Full markdown or plain text description..."
 }
 ```
@@ -79,7 +122,7 @@ Liveness check.
 
 ## Mod files
 
-**GET** `/mods/:provider/:projectId/files` (or equivalent)
+**GET** `/v1/mod/:projectId/files`
 
 ### Response: `ModFilesResponse`
 
@@ -110,15 +153,15 @@ Liveness check.
 
 ## Resolve from URL
 
-**POST** `/mods/resolve`
+**POST** `/v1/resolve-from-url`
 
-Resolve a CurseForge (or other) mod page URL to a canonical provider + projectId + slug.
+Resolve a CurseForge **Hytale** mod page URL to provider + projectId + slug. Only `curseforge.com/hytale/mods/<slug>` URLs are accepted.
 
 ### Request: `ResolveFromUrlRequest`
 
 ```json
 {
-  "url": "https://www.curseforge.com/minecraft/mc-mods/fabric-api"
+  "url": "https://www.curseforge.com/hytale/mods/epics-potion-trader"
 }
 ```
 
@@ -127,8 +170,8 @@ Resolve a CurseForge (or other) mod page URL to a canonical provider + projectId
 ```json
 {
   "provider": "curseforge",
-  "projectId": 306612,
-  "slug": "fabric-api"
+  "projectId": 123456,
+  "slug": "epics-potion-trader"
 }
 ```
 

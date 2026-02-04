@@ -3,15 +3,20 @@ import { cors } from "hono/cors";
 import { errorResponseSchema } from "@hyghertales/shared";
 import health from "./routes/health.js";
 import { createSearchRoutes } from "./routes/search.js";
+import { createFeaturedRoutes } from "./routes/featured.js";
 import { createModRoutes } from "./routes/mod.js";
 import { createResolveRoutes } from "./routes/resolve.js";
 import { createDownloadRoutes } from "./routes/download.js";
+import { createCategoriesRoutes } from "./routes/categories.js";
 import { createCurseForgeClient } from "./lib/curseforge.js";
+import { createOrbisClient } from "./lib/orbis.js";
 import { createRateLimitMiddleware } from "./lib/rateLimit.js";
-import { AppError } from "./lib/errors.js";
 import { env } from "./lib/env.js";
+import { AppError } from "./lib/errors.js";
+import { createOrbisRoutes } from "./routes/orbis.js";
 
 const cf = createCurseForgeClient(env.CURSEFORGE_API_KEY, env.CURSEFORGE_GAME_ID);
+const orbis = createOrbisClient();
 
 const app = new Hono();
 
@@ -36,11 +41,14 @@ app.use(
 // Health (no prefix)
 app.route("/health", health);
 
-// v1 API
+// v1 API (uses API key from .env only)
 app.route("/v1/search", createSearchRoutes(cf));
+app.route("/v1/featured", createFeaturedRoutes(cf));
+app.route("/v1/categories", createCategoriesRoutes(cf));
 app.route("/v1/mod", createModRoutes(cf));
 app.route("/v1/resolve-from-url", createResolveRoutes(cf));
 app.route("/v1/download", createDownloadRoutes(cf));
+app.route("/v1/orbis", createOrbisRoutes(orbis));
 
 // Central error handler: return ErrorResponse consistently
 type HttpStatus = 400 | 404 | 500 | 503;

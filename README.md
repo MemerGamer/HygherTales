@@ -1,6 +1,6 @@
 # HygherTales
 
-Cross-platform desktop app for managing mods and optionally launching a legally installed game.
+**Hytale-only** mod launcher: cross-platform desktop app for browsing and managing Hytale mods from CurseForge, and optionally launching a legally installed Hytale client.
 
 ## Prerequisites
 
@@ -47,7 +47,7 @@ bun run --cwd apps/proxy dev
 
 The API runs at `http://localhost:8787` by default. Try: [http://localhost:8787/health](http://localhost:8787/health) → `{ "ok": true }`.
 
-Copy `apps/proxy/.env.example` to `apps/proxy/.env` and set `CURSEFORGE_API_KEY`, `PORT`, and optionally `CURSEFORGE_GAME_ID`.
+Copy `apps/proxy/.env.example` to `apps/proxy/.env` and set `CURSEFORGE_API_KEY` and `CURSEFORGE_GAME_ID` (Hytale's CurseForge game ID). See [apps/proxy/README.md](apps/proxy/README.md) for how to get an API key (fixes 403) and the game ID.
 
 ## Running the desktop app
 
@@ -90,10 +90,10 @@ This runs the proxy and the desktop app in parallel (proxy + Tauri dev).
 
 - **Monorepo**: Bun workspaces
 - **Desktop**: Tauri v2, TypeScript, React, Vite
-- **Proxy API**: Bun, TypeScript, Hono
+- **Proxy API**: Bun, TypeScript, Hono (CurseForge wrapper, **Hytale mods only**)
 - **Shared**: TypeScript, Zod (schemas and types)
 - **Tooling**: ESLint, Prettier (root config), TypeScript (base + references)
 
 ## Legal
 
-This project does not include any pirated or illegal game files. It does not provide auth bypass or DRM bypass. The app manages mods and can optionally launch a legally installed game.
+This project does not include any pirated or illegal game files. It does not provide auth bypass or DRM bypass. The app is a **Hytale** mod launcher and can optionally launch a legally installed Hytale client.

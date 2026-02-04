@@ -7,6 +7,8 @@ import { AppError } from "../lib/errors.js";
 
 function mockClient(overrides: Partial<CurseForgeClient> = {}): CurseForgeClient {
   return {
+    getCategories: async () => ({ categories: [] }),
+    getFeaturedMods: async () => ({ items: [], page: 1, pageSize: 20, totalCount: 0 }),
     search: async () => ({ items: [], page: 1, pageSize: 20, totalCount: 0 }),
     getMod: async () => null,
     getModFiles: async () => ({ files: [] }),

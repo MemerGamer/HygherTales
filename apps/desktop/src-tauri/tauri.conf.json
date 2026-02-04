@@ -28,7 +28,7 @@
     "copyright": "",
     "category": "Utility",
     "shortDescription": "HygherTales mod manager",
-    "longDescription": "HygherTales manages mods and can optionally launch a legally installed game."
+    "longDescription": "HygherTales is a Hytale mod launcher: browse and manage CurseForge mods and optionally launch a legally installed Hytale client."
   },
   "plugins": {}
 }

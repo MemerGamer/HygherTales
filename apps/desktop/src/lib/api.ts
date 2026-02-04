@@ -2,9 +2,11 @@ import type { z } from "@hyghertales/shared";
 import {
   healthResponseSchema,
   modSearchResponseSchema,
+  modCategoriesResponseSchema,
   errorResponseSchema,
   type ModSearchRequest,
   type ModSearchResponse,
+  type ModCategoriesResponse,
   type ErrorResponse,
 } from "@hyghertales/shared";
 
@@ -33,7 +35,7 @@ async function fetchJson<T>(
   const url = `${baseUrl.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
   const res = await fetch(url, {
     ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers: { "Content-Type": "application/json", ...(init?.headers as Record<string, string>) },
   });
   const data = (await res.json()) as unknown;
 
@@ -72,9 +74,68 @@ export async function searchMods(
     page: String(params.page),
     pageSize: String(params.pageSize),
   });
+  if (params.categoryId != null && params.categoryId > 0) {
+    searchParams.set("categoryId", String(params.categoryId));
+  }
+  if (params.sortField != null && params.sortField > 0) {
+    searchParams.set("sortField", String(params.sortField));
+  }
+  if (params.sortOrder) {
+    searchParams.set("sortOrder", params.sortOrder);
+  }
   return fetchJson<ModSearchResponse>(
     baseUrl,
     `/v1/search?${searchParams.toString()}`,
+    modSearchResponseSchema
+  );
+}
+
+/** Categories for filter dropdown (Hytale mod subcategories under "Mods" class). */
+export async function getCategories(
+  baseUrl: string
+): Promise<ModCategoriesResponse> {
+  return fetchJson<ModCategoriesResponse>(
+    baseUrl,
+    "/v1/categories",
+    modCategoriesResponseSchema
+  );
+}
+
+/** Featured / popular / recently updated mods for the configured game (no search term). */
+export async function getFeaturedMods(
+  baseUrl: string
+): Promise<ModSearchResponse> {
+  return fetchJson<ModSearchResponse>(
+    baseUrl,
+    "/v1/featured",
+    modSearchResponseSchema
+  );
+}
+
+/** Orbis.place: first page of mods (no API key). */
+export async function getOrbisFeatured(
+  baseUrl: string
+): Promise<ModSearchResponse> {
+  return fetchJson<ModSearchResponse>(
+    baseUrl,
+    "/v1/orbis/featured",
+    modSearchResponseSchema
+  );
+}
+
+/** Orbis.place: paginated list with optional text search (q) and sortBy. */
+export async function getOrbisSearch(
+  baseUrl: string,
+  params: { page?: number; limit?: number; sortBy?: "date" | "downloads" | "name"; q?: string }
+): Promise<ModSearchResponse> {
+  const searchParams = new URLSearchParams();
+  if (params.page != null) searchParams.set("page", String(params.page));
+  if (params.limit != null) searchParams.set("limit", String(params.limit));
+  if (params.sortBy) searchParams.set("sortBy", params.sortBy);
+  if (params.q != null && params.q.trim()) searchParams.set("q", params.q.trim());
+  return fetchJson<ModSearchResponse>(
+    baseUrl,
+    `/v1/orbis/search?${searchParams.toString()}`,
     modSearchResponseSchema
   );
 }

@@ -3,5 +3,8 @@
   "identifier": "default",
   "description": "Default capabilities for HygherTales",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "dialog:allow-open"
+  ]
 }
