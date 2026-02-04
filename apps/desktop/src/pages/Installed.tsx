@@ -6,10 +6,15 @@ import {
   moveModFile,
   moveFileToTrash,
   listModDirFileNames,
+  downloadFileToPath,
+  applyModUpdate,
   nextId,
   type InstalledModRecord,
 } from "../lib/modsDb";
 import { openPath } from "../lib/shell";
+import { getModFiles, getDownloadUrlCurseForge, getDownloadUrlOrbis, ApiError } from "../lib/api";
+import { getLatestFile, isUpdateAvailable } from "../lib/updates";
+import type { ModFile } from "@hyghertales/shared";
 
 /** Mods.disabled path from Mods path (e.g. .../UserData/Mods -> .../UserData/Mods.disabled). */
 function getDisabledDir(modsDir: string): string {
@@ -26,9 +31,15 @@ function isUntracked(mod: InstalledModRecord): boolean {
 
 interface InstalledProps {
   modsDirPath: string | null;
+  proxyBaseUrl: string;
 }
 
-export function Installed({ modsDirPath }: InstalledProps) {
+/** Key for update map: mod id or fallback. */
+function updateKey(mod: InstalledModRecord): string {
+  return mod.id != null ? String(mod.id) : `${mod.provider}-${mod.slug}`;
+}
+
+export function Installed({ modsDirPath, proxyBaseUrl }: InstalledProps) {
   const [mods, setMods] = useState<InstalledModRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +49,10 @@ export function Installed({ modsDirPath }: InstalledProps) {
     inDisabled: string[];
   } | null>(null);
   const [removeConfirm, setRemoveConfirm] = useState<InstalledModRecord | null>(null);
+  const [updateMap, setUpdateMap] = useState<Record<string, ModFile>>({});
+  const [checkingUpdates, setCheckingUpdates] = useState(false);
+  const [updatingIds, setUpdatingIds] = useState<Set<number>>(new Set());
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   const loadMods = useCallback(async () => {
     setLoading(true);
@@ -158,6 +173,7 @@ export function Installed({ modsDirPath }: InstalledProps) {
         installedFilename: filename,
         installedAt: new Date().toISOString(),
         enabled: inModsFolder,
+        pinned: false,
       };
       const updated = [...mods, newMod];
       await writeInstalledMods(updated);
@@ -182,6 +198,169 @@ export function Installed({ modsDirPath }: InstalledProps) {
     setRescanModal(null);
   }, []);
 
+  const canCheckUpdate = (mod: InstalledModRecord): boolean => {
+    if (isUntracked(mod) || mod.pinned) return false;
+    if (mod.provider === "curseforge" && mod.projectId != null) return true;
+    if (mod.provider === "orbis" && mod.resourceId != null) return true;
+    return false;
+  };
+
+  const checkUpdates = useCallback(async () => {
+    setUpdateError(null);
+    setCheckingUpdates(true);
+    const next: Record<string, ModFile> = {};
+    try {
+      const toCheck = mods.filter(canCheckUpdate);
+      await Promise.all(
+        toCheck.map(async (mod) => {
+          try {
+            const id =
+              mod.provider === "curseforge"
+                ? String(mod.projectId)
+                : mod.resourceId!;
+            const res = await getModFiles(proxyBaseUrl, mod.provider, id);
+            const latest = getLatestFile(mod.provider, res.files);
+            if (latest && isUpdateAvailable(mod, latest)) {
+              next[updateKey(mod)] = latest;
+            }
+          } catch {
+            /* skip this mod */
+          }
+        })
+      );
+      setUpdateMap(next);
+    } catch (e) {
+      setUpdateError(String(e));
+    } finally {
+      setCheckingUpdates(false);
+    }
+  }, [mods, proxyBaseUrl]);
+
+  const togglePinned = useCallback(
+    async (mod: InstalledModRecord) => {
+      setActionError(null);
+      const updated = mods.map((m) =>
+        m.id === mod.id ? { ...m, pinned: !(m.pinned ?? false) } : m
+      );
+      await writeInstalledMods(updated);
+      setMods(updated);
+      if (mod.pinned) return;
+      setUpdateMap((prev) => {
+        const key = updateKey(mod);
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    },
+    [mods]
+  );
+
+  const updateOne = useCallback(
+    async (mod: InstalledModRecord) => {
+      const key = updateKey(mod);
+      const latestFile = updateMap[key];
+      if (!latestFile || !modsDirPath || mod.id == null) return;
+      setUpdateError(null);
+      setUpdatingIds((s) => new Set(s).add(mod.id!));
+      const finalDir = mod.enabled ? modsDirPath : disabledDir;
+      const baseDir = finalDir.replace(/\\/g, "/").replace(/\/$/, "");
+      const oldPath = getFilePath(mod);
+      const newFilename = latestFile.fileName || latestFile.displayName || "mod.jar";
+      const tempPath = `${baseDir}/.ht-update-${Date.now()}-${newFilename}`;
+      try {
+        let url: string;
+        if (mod.provider === "curseforge" && mod.projectId != null && latestFile.fileId != null) {
+          const res = await getDownloadUrlCurseForge(
+            proxyBaseUrl,
+            mod.projectId,
+            latestFile.fileId
+          );
+          url = res.url;
+        } else if (
+          mod.provider === "orbis" &&
+          mod.resourceId != null &&
+          latestFile.versionId != null &&
+          latestFile.fileIndex != null
+        ) {
+          const res = await getDownloadUrlOrbis(
+            proxyBaseUrl,
+            mod.resourceId,
+            latestFile.versionId,
+            latestFile.fileIndex
+          );
+          url = res.url;
+        } else if (latestFile.downloadUrl) {
+          url = latestFile.downloadUrl;
+        } else {
+          throw new Error("Cannot get download URL for this file.");
+        }
+        const downloadedPath = await downloadFileToPath(url, tempPath);
+        const finalFilename = await applyModUpdate(
+          oldPath,
+          downloadedPath,
+          finalDir,
+          newFilename
+        );
+        const updated = mods.map((m) =>
+          m.id === mod.id
+            ? {
+                ...m,
+                installedFilename: finalFilename,
+                installedAt: new Date().toISOString(),
+                installedFileId:
+                  mod.provider === "curseforge"
+                    ? latestFile.fileId ?? m.installedFileId
+                    : latestFile.versionId != null && latestFile.fileIndex != null
+                      ? `${latestFile.versionId}:${latestFile.fileIndex}`
+                      : m.installedFileId,
+              }
+            : m
+        );
+        await writeInstalledMods(updated);
+        setMods(updated);
+        setUpdateError(null);
+        setUpdateMap((prev) => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+      } catch (e) {
+        const msg =
+          e instanceof ApiError && e.status === 503
+            ? "This mod's download is restricted by CurseForge distribution settings. You may need to download it manually from the website."
+            : e instanceof ApiError
+              ? e.body?.message ?? e.message
+              : String(e);
+        setUpdateError(msg);
+      } finally {
+        setUpdatingIds((s) => {
+          const next = new Set(s);
+          next.delete(mod.id!);
+          return next;
+        });
+      }
+    },
+    [
+      updateMap,
+      modsDirPath,
+      disabledDir,
+      mods,
+      getFilePath,
+      proxyBaseUrl,
+    ]
+  );
+
+  const updateAll = useCallback(async () => {
+    const toUpdate = mods.filter(
+      (m) => m.id != null && !m.pinned && updateMap[updateKey(m)] != null
+    );
+    for (const mod of toUpdate) {
+      await updateOne(mod);
+    }
+  }, [mods, updateMap, updateOne]);
+
+  const hasAnyUpdate = Object.keys(updateMap).length > 0;
+
   if (!modsDirPath?.trim()) {
     return (
       <section className="page">
@@ -200,7 +379,29 @@ export function Installed({ modsDirPath }: InstalledProps) {
         <button type="button" onClick={runRescan} disabled={loading}>
           Rescan folders
         </button>
+        <button
+          type="button"
+          onClick={checkUpdates}
+          disabled={loading || checkingUpdates}
+        >
+          {checkingUpdates ? "Checking…" : "Check updates"}
+        </button>
+        {hasAnyUpdate && (
+          <button
+            type="button"
+            className="installed-update-all"
+            onClick={updateAll}
+            disabled={updatingIds.size > 0}
+          >
+            {updatingIds.size > 0 ? "Updating…" : "Update all"}
+          </button>
+        )}
       </div>
+      {updateError && (
+        <div className="error-banner" role="alert">
+          {updateError}
+        </div>
+      )}
       {actionError && (
         <div className="error-banner" role="alert">
           {actionError}
@@ -217,39 +418,71 @@ export function Installed({ modsDirPath }: InstalledProps) {
         <p>No mods in the database. Install mods from Browse (downloads go to your Mods folder).</p>
       ) : (
         <ul className="installed-list">
-          {mods.map((mod) => (
-            <li key={mod.id ?? mod.installedFilename} className="installed-item">
-              <div className="installed-info">
-                <strong>{isUntracked(mod) ? mod.installedFilename : mod.name}</strong>
-                <span className="installed-meta">
-                  {mod.installedFilename}
-                  {" · "}
-                  {new Date(mod.installedAt).toLocaleDateString()}
-                  {" · "}
-                  {mod.enabled ? "Enabled" : "Disabled"}
-                </span>
-              </div>
-              <div className="installed-actions">
-                <button
-                  type="button"
-                  onClick={() => toggleEnabled(mod)}
-                  title={mod.enabled ? "Disable" : "Enable"}
-                >
-                  {mod.enabled ? "Disable" : "Enable"}
-                </button>
-                <button type="button" onClick={() => openInFolder(mod)}>
-                  Open in folder
-                </button>
-                <button
-                  type="button"
-                  className="installed-remove"
-                  onClick={() => setRemoveConfirm(mod)}
-                >
-                  Remove
-                </button>
-              </div>
-            </li>
-          ))}
+          {mods.map((mod) => {
+            const key = updateKey(mod);
+            const latestFile = updateMap[key];
+            const updateAvailable = latestFile != null && !mod.pinned;
+            const isUpdating = mod.id != null && updatingIds.has(mod.id);
+            return (
+              <li key={mod.id ?? mod.installedFilename} className="installed-item">
+                <div className="installed-info">
+                  <strong>
+                    {isUntracked(mod) ? mod.installedFilename : mod.name}
+                    {updateAvailable && (
+                      <span className="installed-badge">Update available</span>
+                    )}
+                  </strong>
+                  <span className="installed-meta">
+                    {mod.installedFilename}
+                    {" · "}
+                    {new Date(mod.installedAt).toLocaleDateString()}
+                    {" · "}
+                    {mod.enabled ? "Enabled" : "Disabled"}
+                    {mod.pinned && " · Pinned"}
+                  </span>
+                </div>
+                <div className="installed-actions">
+                  {!isUntracked(mod) && (
+                    <label className="installed-pinned">
+                      <input
+                        type="checkbox"
+                        checked={!!mod.pinned}
+                        onChange={() => togglePinned(mod)}
+                      />
+                      Pinned
+                    </label>
+                  )}
+                  {updateAvailable && (
+                    <button
+                      type="button"
+                      className="installed-update-btn"
+                      onClick={() => updateOne(mod)}
+                      disabled={isUpdating}
+                    >
+                      {isUpdating ? "Updating…" : "Update"}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => toggleEnabled(mod)}
+                    title={mod.enabled ? "Disable" : "Enable"}
+                  >
+                    {mod.enabled ? "Disable" : "Enable"}
+                  </button>
+                  <button type="button" onClick={() => openInFolder(mod)}>
+                    Open in folder
+                  </button>
+                  <button
+                    type="button"
+                    className="installed-remove"
+                    onClick={() => setRemoveConfirm(mod)}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
 

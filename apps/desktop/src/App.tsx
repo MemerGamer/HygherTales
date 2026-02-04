@@ -49,7 +49,12 @@ function App() {
             modsDirPath={settings.modsDirPath}
           />
         )}
-        {page === "installed" && <Installed modsDirPath={settings.modsDirPath} />}
+        {page === "installed" && (
+          <Installed
+            modsDirPath={settings.modsDirPath}
+            proxyBaseUrl={settings.proxyBaseUrl}
+          />
+        )}
         {page === "settings" && (
           <SettingsPage onSettingsChange={handleSettingsChange} />
         )}

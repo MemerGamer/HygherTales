@@ -514,6 +514,15 @@
   background: rgba(255, 255, 255, 0.25);
 }
 
+.installed-toolbar .installed-update-all {
+  background: rgba(80, 160, 80, 0.35);
+  border-color: rgba(100, 200, 100, 0.5);
+}
+
+.installed-toolbar .installed-update-all:hover:not(:disabled) {
+  background: rgba(80, 160, 80, 0.5);
+}
+
 .installed-list {
   list-style: none;
   margin: 0;
@@ -544,6 +553,39 @@
   display: block;
   color: #fff;
   margin-bottom: 0.2rem;
+}
+
+.installed-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.15em 0.5em;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #1a1a1a;
+  background: #7ed67e;
+  border-radius: 3px;
+}
+
+.installed-pinned {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+}
+
+.installed-pinned input {
+  cursor: pointer;
+}
+
+.installed-update-btn {
+  background: rgba(80, 160, 80, 0.35) !important;
+  border-color: rgba(100, 200, 100, 0.5) !important;
+}
+
+.installed-update-btn:hover:not(:disabled) {
+  background: rgba(80, 160, 80, 0.5) !important;
 }
 
 .installed-meta {

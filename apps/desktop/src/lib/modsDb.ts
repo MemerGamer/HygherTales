@@ -17,6 +17,7 @@ export interface InstalledModRecord {
   installedAt: string;
   sourceUrl?: string | null;
   enabled: boolean;
+  pinned?: boolean;
 }
 
 export async function readInstalledMods(): Promise<InstalledModRecord[]> {
@@ -58,6 +59,21 @@ export async function downloadFileToPath(
   destPath: string
 ): Promise<string> {
   return invoke("download_file_to_path", { url, destPath });
+}
+
+/** Safe update: backup old file to Mods.backup, move new temp file into place. Returns new filename. */
+export async function applyModUpdate(
+  oldPath: string,
+  newTempPath: string,
+  finalDir: string,
+  newFilename: string
+): Promise<string> {
+  return invoke("apply_mod_update", {
+    oldPath,
+    newTempPath,
+    finalDir,
+    newFilename,
+  });
 }
 
 /** Generate next id for a new record (max existing + 1). */

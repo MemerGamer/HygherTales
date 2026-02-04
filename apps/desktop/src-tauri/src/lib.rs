@@ -34,6 +34,8 @@ pub struct InstalledModRecord {
     pub installed_at: String,
     pub source_url: Option<String>,
     pub enabled: bool,
+    #[serde(default)]
+    pub pinned: bool,
 }
 
 const INSTALLED_MODS_FILENAME: &str = "installed_mods.json";
@@ -289,6 +291,43 @@ fn check_writable(path: &std::path::Path) -> bool {
     }
 }
 
+/// Safe update: move old file to backup (Mods.backup/name.bak), then move new temp file into place.
+/// Returns the new filename (so the frontend can update the DB).
+#[tauri::command]
+fn apply_mod_update(
+    old_path: String,
+    new_temp_path: String,
+    final_dir: String,
+    new_filename: String,
+) -> Result<String, String> {
+    let old_p = PathBuf::from(old_path.trim());
+    let new_temp = PathBuf::from(new_temp_path.trim());
+    let final_dir_p = PathBuf::from(final_dir.trim());
+    let new_filename = new_filename.trim();
+    if !old_p.exists() {
+        return Err("Existing mod file not found".to_string());
+    }
+    if !new_temp.exists() {
+        return Err("New downloaded file not found".to_string());
+    }
+    if new_filename.is_empty() {
+        return Err("New filename is empty".to_string());
+    }
+    let parent = final_dir_p.parent().unwrap_or_else(|| final_dir_p.as_path());
+    let backup_dir = parent.join("Mods.backup");
+    fs::create_dir_all(&backup_dir).map_err(|e| e.to_string())?;
+    let old_name = old_p
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("mod");
+    let backup_base = format!("{}.bak", old_name);
+    let backup_path = unique_file_path(&backup_dir.join(&backup_base));
+    fs::rename(&old_p, &backup_path).map_err(|e| e.to_string())?;
+    let dest = final_dir_p.join(new_filename);
+    fs::rename(&new_temp, &dest).map_err(|e| e.to_string())?;
+    Ok(new_filename.to_string())
+}
+
 /// Open a path (file or folder) in the system file manager. Does not use the shell plugin
 /// so file:// URLs are not needed; the shell plugin only allows http/https/mailto/tel.
 #[tauri::command]
@@ -346,6 +385,7 @@ pub fn run() {
             list_mod_dir_file_names,
             download_file_to_path,
             open_path_in_file_manager,
+            apply_mod_update,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
