@@ -185,6 +185,10 @@ jobs:
             fs.writeFileSync(path, JSON.stringify(c, null, 2));
           "
 
+      - name: Generate icon.ico
+        run: bun run generate-icon-ico
+        working-directory: apps/desktop
+
       - name: Build desktop (Linux)
         run: bun run build
         working-directory: apps/desktop
