@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.5](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.1.4...hyghertales-v0.1.5) (2026-02-05)
+
+
+### Bug Fixes
+
+* address Linux AppImage blank window issue ([fa60c32](https://github.com/MemerGamer/HygherTales/commit/fa60c32ebe2ffd3422603ea570b85ddd07c0eb7a))
+* update Tauri configuration and build process ([30a50f3](https://github.com/MemerGamer/HygherTales/commit/30a50f38ce31f8c56373cd47773665b6c305f55e))
+
 ## [0.1.4](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.1.3...hyghertales-v0.1.4) (2026-02-05)
 
 
