@@ -2,9 +2,28 @@
 
 Steps to ship a HygherTales release.
 
+## 0. When does release-please open a PR?
+
+Release-please **only** opens a release PR when it finds **`feat:`** or **`fix:`** commits on `main`. Other types (`chore:`, `docs:`, `ci:`, etc.) are **ignored** and do not trigger a release.
+
+- `feat: something` → minor release (e.g. 0.1.0 → 0.2.0)
+- `fix: something` → patch (0.1.0 → 0.1.1)
+- `chore:`, `docs:`, merge commits, "update", "wip" → **no release**
+
+If you see **"No user facing commits found - skipping"** in the Actions log, there were no `feat:` or `fix:` commits since the last release.
+
+**To trigger a release with an empty commit (use `fix:` or `feat:`):**
+
+```bash
+git commit --allow-empty -m "fix: release"
+git push origin main
+```
+
+Or use a real change: `feat: add X`, `fix: Y`, etc.
+
 ## 1. Merge release-please PR
 
-Release-please opens a PR when commits are pushed to `main`. Merging it:
+Release-please opens a PR when such commits exist on `main`. Merging it:
 
 - Bumps version in `package.json`
 - Updates `CHANGELOG.md`
