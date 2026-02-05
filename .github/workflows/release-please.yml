@@ -59,8 +59,11 @@ jobs:
         shell: pwsh
 
       - name: Generate Windows icon (icon.ico)
-        run: bun run tauri icon src-tauri/icons/icon.png
+        run: |
+          bun run tauri icon src-tauri/icons/icon.png || bun run generate-icon-ico
+          if (!(Test-Path src-tauri/icons/icon.ico)) { throw "icon.ico was not created" }
         working-directory: apps/desktop
+        shell: pwsh
 
       - name: Build desktop (Windows)
         run: bun run build
@@ -113,6 +116,10 @@ jobs:
             c.version = process.env.VERSION;
             fs.writeFileSync(path, JSON.stringify(c, null, 2));
           "
+
+      - name: Generate macOS icon (icon.icns)
+        run: bun run tauri icon src-tauri/icons/icon.png
+        working-directory: apps/desktop
 
       - name: Build desktop (macOS)
         run: bun run build
@@ -182,7 +189,7 @@ jobs:
         run: |
           TAG="${{ needs.release-please.outputs.tag_name }}"
           BUNDLE="apps/desktop/src-tauri/target/release/bundle"
-          find "$BUNDLE" -type f \( -name "*.deb" -o -name "*.AppImage" -o -name "*.AppImage.tar.gz" -o -name "*.AppImage.tar.gz.sig" \) -exec gh release upload "$TAG" {} \;
+          find "$BUNDLE" -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o -name "*.AppImage.tar.gz" -o -name "*.AppImage.tar.gz.sig" \) -exec gh release upload "$TAG" {} \;
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
