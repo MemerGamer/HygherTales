@@ -44,17 +44,18 @@ console.log(`Building proxy sidecar for ${target}...`);
 console.log(`API key length: ${apiKey.length} characters`);
 
 // Map target to Bun compile target
+// macOS: use arm64 (aarch64) - GitHub macos-latest runners are Apple Silicon
 const bunTargetMap: Record<string, string> = {
   linux: "bun-linux-x64",
   windows: "bun-windows-x64",
-  macos: "bun-darwin-x64",
+  macos: "bun-darwin-arm64",
 };
 
 // Map target to Tauri's expected binary name suffix
 const tauriSuffixMap: Record<string, string> = {
   linux: "x86_64-unknown-linux-gnu",
   windows: "x86_64-pc-windows-msvc.exe",
-  macos: "x86_64-apple-darwin",
+  macos: "aarch64-apple-darwin",
 };
 
 const bunTarget = bunTargetMap[target];

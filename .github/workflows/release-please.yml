@@ -58,6 +58,10 @@ jobs:
           $tauri | ConvertTo-Json -Depth 10 | Set-Content apps/desktop/src-tauri/tauri.conf.json
         shell: pwsh
 
+      - name: Generate Windows icon (icon.ico)
+        run: bun run tauri icon src-tauri/icons/icon.png
+        working-directory: apps/desktop
+
       - name: Build desktop (Windows)
         run: bun run build
         working-directory: apps/desktop
