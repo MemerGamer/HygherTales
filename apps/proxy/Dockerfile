@@ -7,7 +7,8 @@ FROM oven/bun:1.3 AS builder
 WORKDIR /app
 
 # Workspace root and shared package (needed for proxy build)
-COPY package.json bun.lock* ./
+# Root tsconfig.json is required: packages/shared/tsconfig.json extends it
+COPY package.json bun.lock* tsconfig.json ./
 COPY packages/shared packages/shared
 COPY apps/proxy apps/proxy
 

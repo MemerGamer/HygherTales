@@ -40,7 +40,8 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build shared package
-        run: bun run build --cwd packages/shared
+        run: bun run build
+        working-directory: packages/shared
 
       - name: Build proxy sidecar (Windows)
         run: bun run build:sidecar -- --target=windows
@@ -87,7 +88,8 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build shared package
-        run: bun run build --cwd packages/shared
+        run: bun run build
+        working-directory: packages/shared
 
       - name: Build proxy sidecar (macOS)
         run: bun run build:sidecar -- --target=macos
@@ -145,7 +147,8 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build shared package
-        run: bun run build --cwd packages/shared
+        run: bun run build
+        working-directory: packages/shared
 
       - name: Build proxy sidecar (Linux)
         run: bun run build:sidecar -- --target=linux
