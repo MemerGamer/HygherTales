@@ -21,6 +21,20 @@ git push origin main
 
 Or use a real change: `feat: add X`, `fix: Y`, etc.
 
+## 0b. CI secret: CURSEFORGE_API_KEY
+
+The build jobs need your CurseForge API key to embed it in the proxy sidecar. Use **one** of these:
+
+**Option A – Repository secret (simplest)**  
+Settings → Secrets and variables → Actions → **Repository secrets** → New repository secret → Name: `CURSEFORGE_API_KEY`, Value: your key.
+
+**Option B – Environment secret**  
+The workflow runs build jobs in the **release** environment. So either:
+- Create an environment named **release**: Settings → Environments → New environment → name: `release` → add Environment secret `CURSEFORGE_API_KEY`,  
+- or add the same secret under Repository secrets (Option A).
+
+If you added the key under "Environment secrets" for a different environment (e.g. "production"), it will not be visible to the workflow. Use Option A or create/use the **release** environment.
+
 ## 1. Merge release-please PR
 
 Release-please opens a PR when such commits exist on `main`. Merging it:

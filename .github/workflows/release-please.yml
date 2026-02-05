@@ -27,6 +27,7 @@ jobs:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created }}
     runs-on: windows-latest
+    environment: release
     steps:
       - uses: "actions/checkout@v4"
 
@@ -75,6 +76,7 @@ jobs:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created }}
     runs-on: macos-latest
+    environment: release
     steps:
       - uses: "actions/checkout@v4"
 
@@ -124,6 +126,7 @@ jobs:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created }}
     runs-on: ubuntu-22.04
+    environment: release
     steps:
       - uses: "actions/checkout@v4"
 
