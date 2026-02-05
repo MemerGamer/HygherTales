@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.7](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.1.6...hyghertales-v0.1.7) (2026-02-05)
+
+
+### Bug Fixes
+
+* windows ico build step ([741e0ec](https://github.com/MemerGamer/HygherTales/commit/741e0ece00fc4f7fd68d259a40d6f7a0c17aa6aa))
+
 ## [0.1.6](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.1.5...hyghertales-v0.1.6) (2026-02-05)
 
 
