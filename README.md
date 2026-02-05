@@ -31,6 +31,16 @@ Mod launcher for Hytale. Browse and install mods from CurseForge and Orbis.place
 
 Pick the latest release from [releases](https://github.com/MemerGamer/HygherTales/releases) and download the appropriate binary for your platform.
 
+### Linux AppImage: blank window
+
+If the AppImage shows a blank window or prints `Could not create default EGL display: EGL_BAD_PARAMETER`, run it with:
+
+```bash
+WEBKIT_DISABLE_COMPOSITING_MODE=1 GDK_BACKEND=x11 ./HygherTales_*.AppImage
+```
+
+Or use the .deb package from the same release if your distro supports it; it often avoids this issue.
+
 ## Development guide
 ## Prerequisites
 
