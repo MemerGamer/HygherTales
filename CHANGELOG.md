@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.8](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.1.7...hyghertales-v0.1.8) (2026-02-05)
+
+
+### Bug Fixes
+
+* linux ci build ([3f5a086](https://github.com/MemerGamer/HygherTales/commit/3f5a086c7f8863267ad97787c472890554fafb5d))
+
 ## [0.1.7](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.1.6...hyghertales-v0.1.7) (2026-02-05)
 
 
