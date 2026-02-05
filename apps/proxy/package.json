@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@hyghertales/shared": "workspace:*",
+    "dotenv": "^16.4.5",
     "hono": "^4.6.12"
   },
   "devDependencies": {

@@ -69,6 +69,8 @@ export function Browse({ proxyBaseUrl, modsDirPath }: BrowseProps) {
   const [categories, setCategories] = useState<ModCategory[]>([]);
   const [items, setItems] = useState<ModSummary[]>([]);
   const [totalCount, setTotalCount] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(20);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedMod, setSelectedMod] = useState<ModSummary | null>(null);
@@ -102,6 +104,7 @@ export function Browse({ proxyBaseUrl, modsDirPath }: BrowseProps) {
     } finally {
       setLoading(false);
     }
+    setCurrentPage(1);
   }, [proxyBaseUrl, source]);
 
   useEffect(() => {
@@ -122,14 +125,14 @@ export function Browse({ proxyBaseUrl, modsDirPath }: BrowseProps) {
     loadCategories();
   }, [loadCategories]);
 
-  const doSearch = useCallback(async () => {
+  const doSearch = useCallback(async (page = 1) => {
     setError(null);
     setLoading(true);
     try {
       if (source === "orbis") {
         const res = await getOrbisSearch(proxyBaseUrl, {
-          page: 1,
-          limit: 20,
+          page,
+          limit: pageSize,
           sortBy: orbisSortBy,
           ...(query.trim() && { q: query.trim() }),
         });
@@ -138,8 +141,8 @@ export function Browse({ proxyBaseUrl, modsDirPath }: BrowseProps) {
       } else {
         const res = await searchMods(proxyBaseUrl, {
           q: query.trim(),
-          page: 1,
-          pageSize: 20,
+          page,
+          pageSize,
           ...(categoryId > 0 && { categoryId }),
           ...(sortField > 0 && { sortField }),
           sortOrder,
@@ -147,6 +150,7 @@ export function Browse({ proxyBaseUrl, modsDirPath }: BrowseProps) {
         setItems(res.items);
         setTotalCount(res.totalCount);
       }
+      setCurrentPage(page);
     } catch (e) {
       if (e instanceof ApiError) {
         setError(e.body?.message ?? e.message);
@@ -158,7 +162,7 @@ export function Browse({ proxyBaseUrl, modsDirPath }: BrowseProps) {
     } finally {
       setLoading(false);
     }
-  }, [proxyBaseUrl, source, query, categoryId, sortField, sortOrder, orbisSortBy]);
+  }, [proxyBaseUrl, source, query, categoryId, sortField, sortOrder, orbisSortBy, pageSize]);
 
   const modKey = (mod: ModSummary) =>
     mod.provider === "curseforge"
@@ -295,13 +299,13 @@ export function Browse({ proxyBaseUrl, modsDirPath }: BrowseProps) {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && doSearch()}
+            onKeyDown={(e) => e.key === "Enter" && doSearch(1)}
             placeholder={source === "orbis" ? "Search Orbis.place mods…" : "Search CurseForge mods…"}
             disabled={loading}
             aria-label="Search mods"
             className="flex-1"
           />
-          <Button onClick={doSearch} disabled={loading}>
+          <Button onClick={() => doSearch(1)} disabled={loading}>
             {loading ? "Loading…" : "Search"}
           </Button>
         </div>
@@ -435,9 +439,12 @@ export function Browse({ proxyBaseUrl, modsDirPath }: BrowseProps) {
 
       {/* Results count */}
       {items.length > 0 && (
-        <p className="mb-4 text-sm text-[var(--color-text-muted)]">
-          {totalCount} result{totalCount !== 1 ? "s" : ""}
-        </p>
+        <div className="mb-4 flex items-center justify-between">
+          <p className="text-sm text-[var(--color-text-muted)]">
+            {totalCount} result{totalCount !== 1 ? "s" : ""}
+            {totalCount > pageSize && ` · Page ${currentPage} of ${Math.ceil(totalCount / pageSize)}`}
+          </p>
+        </div>
       )}
 
       {/* Loading state */}
@@ -493,6 +500,29 @@ export function Browse({ proxyBaseUrl, modsDirPath }: BrowseProps) {
           </Card>
         ))}
       </div>
+
+      {/* Pagination controls */}
+      {totalCount > pageSize && (
+        <div className="mt-6 flex items-center justify-center gap-2">
+          <Button
+            size="sm"
+            disabled={currentPage === 1 || loading}
+            onClick={() => doSearch(currentPage - 1)}
+          >
+            Previous
+          </Button>
+          <span className="px-4 text-sm text-[var(--color-text)]">
+            Page {currentPage} of {Math.ceil(totalCount / pageSize)}
+          </span>
+          <Button
+            size="sm"
+            disabled={currentPage >= Math.ceil(totalCount / pageSize) || loading}
+            onClick={() => doSearch(currentPage + 1)}
+          >
+            Next
+          </Button>
+        </div>
+      )}
 
       {/* Mod detail modal */}
       <Modal

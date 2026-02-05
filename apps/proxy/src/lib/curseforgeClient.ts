@@ -50,7 +50,9 @@ async function cfFetch<T>(
     if (res.status === 403) {
       throw new Error(
         `CurseForge API 403 (forbidden). ${text || "No body."} ` +
-          "Use a valid API key in apps/proxy/.env (CURSEFORGE_API_KEY). See apps/proxy/README.md."
+          "Use a valid API key in apps/proxy/.env (CURSEFORGE_API_KEY). " +
+          "No quotes around the value. Keys with special characters (e.g. $2a$10$...) work correctly. " +
+          "Verify with: curl -H \"x-api-key: YOUR_KEY\" \"https://api.curseforge.com/v1/games?pageSize=5\". See apps/proxy/README.md."
       );
     }
     throw new Error(`CurseForge API ${res.status}: ${text || "(no body)"}`);
@@ -71,15 +73,17 @@ export function createCurseForgeApiClient(apiKey: string) {
       }
       // API uses 0-based index
       const index = Math.max(0, (page - 1) * pageSize);
-      const body: Record<string, unknown> = {
-        gameId,
-        searchFilter: q || undefined,
-        index,
-        pageSize,
-      };
-      if (categoryId != null && categoryId > 0) body.categoryId = categoryId;
-      if (sortField != null && sortField > 0) body.sortField = sortField;
-      if (sortOrder) body.sortOrder = sortOrder;
+      
+      // Build query string for GET request (CurseForge API requires GET, not POST)
+      const query = new URLSearchParams();
+      query.set("gameId", String(gameId));
+      query.set("index", String(index));
+      query.set("pageSize", String(pageSize));
+      if (q) query.set("searchFilter", q);
+      if (categoryId != null && categoryId > 0) query.set("categoryId", String(categoryId));
+      if (sortField != null && sortField > 0) query.set("sortField", String(sortField));
+      if (sortOrder) query.set("sortOrder", sortOrder);
+
       type SearchRes = {
         data?: CfMod[];
         pagination?: {
@@ -89,11 +93,7 @@ export function createCurseForgeApiClient(apiKey: string) {
           total?: number;
         };
       };
-      const res = await cfFetch<SearchRes>(
-        apiKey,
-        "/mods/search",
-        { method: "POST", body: JSON.stringify(body) }
-      );
+      const res = await cfFetch<SearchRes>(apiKey, `/mods/search?${query.toString()}`);
       const pag = res.pagination;
       const totalCount =
         pag?.totalCount ?? pag?.total ?? (res.data?.length ?? 0);
@@ -163,6 +163,14 @@ export function createCurseForgeApiClient(apiKey: string) {
         `/mods/${projectId}/files`
       );
       return res?.data ?? [];
+    },
+
+    async getModDescription(projectId: number): Promise<string | null> {
+      const res = await cfFetch<{ data?: string }>(
+        apiKey,
+        `/mods/${projectId}/description`
+      );
+      return res?.data ?? null;
     },
 
     /**

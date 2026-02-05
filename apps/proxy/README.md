@@ -32,6 +32,20 @@ Set in `apps/proxy/.env`:
 CURSEFORGE_API_KEY=your_key_here
 ```
 
+**Keys with special characters (e.g. `$2a$10$...`) work correctly** — paste them as-is with no escaping needed.
+
+**If you still get 403:**
+
+1. **No quotes** – Use `CURSEFORGE_API_KEY=abc123` not `CURSEFORGE_API_KEY="abc123"`.
+2. **No extra spaces or newlines** – Paste the key on a single line with no space after `=`.
+3. **Verify the key** – From a terminal:
+   ```bash
+   curl -H "x-api-key: YOUR_KEY_HERE" "https://api.curseforge.com/v1/games?pageSize=5"
+   ```
+   If you get JSON with a `data` array, the key works. If you get 403, the key is invalid or not yet active.
+4. **Activation delay** – Keys from the [3rd-party form](https://forms.monday.com/forms/dce5ccb7afda9a1c21dab1a1aa1d84eb?r=use1) can take a short time to activate after approval.
+5. **Run from proxy directory** – When running the server, use `bun run dev:proxy` from the repo root (so the proxy runs with `apps/proxy` as cwd and loads `.env`), or run `bun run dev` from `apps/proxy`.
+
 ---
 
 ## Finding Hytale's game ID

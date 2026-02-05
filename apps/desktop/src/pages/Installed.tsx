@@ -86,6 +86,7 @@ export function Installed({ modsDirPath, proxyBaseUrl }: InstalledProps) {
   const [checkingUpdates, setCheckingUpdates] = useState(false);
   const [updatingIds, setUpdatingIds] = useState<Set<number>>(new Set());
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [updateSuccess, setUpdateSuccess] = useState<string | null>(null);
   const [profilesData, setProfilesData] = useState<ProfilesData | null>(null);
   const [profileModal, setProfileModal] = useState<
     "create" | { rename: ProfileRecord } | { delete: ProfileRecord } | null
@@ -109,14 +110,47 @@ export function Installed({ modsDirPath, proxyBaseUrl }: InstalledProps) {
     setError(null);
     try {
       const list = await readInstalledMods();
-      setMods(list);
+      
+      // Verify enabled state matches actual file location
+      if (modsDirPath) {
+        const disabledDirPath = getDisabledDir(modsDirPath);
+        const [modsFiles, disabledFiles] = await Promise.all([
+          listModDirFileNames(modsDirPath).catch(() => [] as string[]),
+          listModDirFileNames(disabledDirPath).catch(() => [] as string[]),
+        ]);
+        const modsSet = new Set(modsFiles);
+        const disabledSet = new Set(disabledFiles);
+        
+        let needsUpdate = false;
+        const verified = list.map((mod) => {
+          const inMods = modsSet.has(mod.installedFilename);
+          const inDisabled = disabledSet.has(mod.installedFilename);
+          const actualEnabled = inMods && !inDisabled;
+          
+          // Sync DB state with actual file location
+          if (mod.enabled !== actualEnabled && (inMods || inDisabled)) {
+            needsUpdate = true;
+            return { ...mod, enabled: actualEnabled };
+          }
+          return mod;
+        });
+        
+        if (needsUpdate) {
+          await writeInstalledMods(verified);
+          setMods(verified);
+        } else {
+          setMods(list);
+        }
+      } else {
+        setMods(list);
+      }
     } catch (e) {
       setError(String(e));
       setMods([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [modsDirPath]);
 
   const loadProfiles = useCallback(async () => {
     try {
@@ -629,28 +663,52 @@ export function Installed({ modsDirPath, proxyBaseUrl }: InstalledProps) {
 
   const checkUpdates = useCallback(async () => {
     setUpdateError(null);
+    setUpdateSuccess(null);
     setCheckingUpdates(true);
     const next: Record<string, ModFile> = {};
+    let checkedCount = 0;
+    let updateCount = 0;
+    
     try {
       const toCheck = mods.filter(canCheckUpdate);
+      checkedCount = toCheck.length;
+      
       await Promise.all(
         toCheck.map(async (mod) => {
-          try {
-            const id =
-              mod.provider === "curseforge"
-                ? String(mod.projectId)
-                : mod.resourceId!;
-            const res = await getModFiles(proxyBaseUrl, mod.provider, id);
-            const latest = getLatestFile(mod.provider, res.files);
-            if (latest && isUpdateAvailable(mod, latest)) {
-              next[updateKey(mod)] = latest;
+          let latest: ModFile | null = null;
+          
+          // Try CurseForge first if we have projectId
+          if (mod.projectId != null) {
+            try {
+              const res = await getModFiles(proxyBaseUrl, "curseforge", String(mod.projectId));
+              latest = getLatestFile("curseforge", res.files);
+            } catch {
+              /* fall through to Orbis */
             }
-          } catch {
-            /* skip this mod */
+          }
+          
+          // Fallback to Orbis if CurseForge failed or no update found
+          if (!latest && mod.resourceId != null) {
+            try {
+              const res = await getModFiles(proxyBaseUrl, "orbis", mod.resourceId);
+              latest = getLatestFile("orbis", res.files);
+            } catch {
+              /* skip */
+            }
+          }
+          
+          if (latest && isUpdateAvailable(mod, latest)) {
+            next[updateKey(mod)] = latest;
+            updateCount++;
           }
         })
       );
+      
       setUpdateMap(next);
+      // Show success message even if no updates
+      setUpdateSuccess(
+        `Checked ${checkedCount} mod(s). ${updateCount > 0 ? `${updateCount} update(s) available.` : "All mods are up to date."}`
+      );
     } catch (e) {
       setUpdateError(String(e));
     } finally {
@@ -911,6 +969,14 @@ export function Installed({ modsDirPath, proxyBaseUrl }: InstalledProps) {
           role="alert"
         >
           {updateError}
+        </div>
+      )}
+      {updateSuccess && (
+        <div
+          className="p-3 mb-4 bg-[rgba(100,160,100,0.2)] border border-[rgba(100,160,100,0.6)] rounded text-[#b3ffb3]"
+          role="status"
+        >
+          {updateSuccess}
         </div>
       )}
       {exportImportError && (

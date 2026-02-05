@@ -163,6 +163,10 @@ export function createCurseForgeClient(apiKey: string, gameId?: number) {
       return parsed;
     },
 
+    async getModDescription(projectId: number): Promise<string | null> {
+      return api.getModDescription(projectId);
+    },
+
     async getFileDownloadUrl(
       projectId: number,
       fileId: number

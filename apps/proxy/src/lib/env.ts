@@ -2,6 +2,14 @@ const PORT_DEFAULT = 8787;
 
 const RATE_LIMIT_PER_MIN_DEFAULT = 60;
 
+/** Trim and strip surrounding quotes (common .env mistake). */
+function normalizeKey(raw: string): string {
+  let s = raw.trim();
+  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'")))
+    s = s.slice(1, -1);
+  return s.trim();
+}
+
 function getEnv(): {
   CURSEFORGE_API_KEY: string;
   PORT: number;
@@ -9,15 +17,26 @@ function getEnv(): {
   CORS_ORIGINS: string[];
   RATE_LIMIT_PER_MIN: number;
 } {
-  const key = Bun.env.CURSEFORGE_API_KEY;
+  const key = process.env.CURSEFORGE_API_KEY; // Use process.env, not Bun.env (dotenv loads into process.env)
   if (!key || key.trim() === "") {
     throw new Error(
       "CURSEFORGE_API_KEY is required. Set it in apps/proxy/.env (see README for how to get a key)."
     );
   }
-  const trimmed = key.trim();
+  const trimmed = normalizeKey(key);
+  if (trimmed === "") {
+    throw new Error(
+      "CURSEFORGE_API_KEY is required. Set it in apps/proxy/.env (see README for how to get a key)."
+    );
+  }
+  
+  // Debug: Log key length to help troubleshoot (remove after fixing)
+  console.log(`[env] API key length: ${trimmed.length} characters`);
+  if (trimmed.length < 20) {
+    console.warn(`[env] WARNING: API key seems too short (${trimmed.length} chars). Check .env file.`);
+  }
 
-  const portRaw = Bun.env.PORT;
+  const portRaw = process.env.PORT;
   const port = portRaw != null ? Number(portRaw) : PORT_DEFAULT;
   if (Number.isNaN(port) || port < 1 || port > 65535) {
     throw new Error(
@@ -25,7 +44,7 @@ function getEnv(): {
     );
   }
 
-  const gameIdRaw = Bun.env.CURSEFORGE_GAME_ID;
+  const gameIdRaw = process.env.CURSEFORGE_GAME_ID;
   const parsed = gameIdRaw != null && gameIdRaw.trim() !== "" ? Number(gameIdRaw.trim()) : NaN;
   const CURSEFORGE_GAME_ID =
     typeof parsed === "number" && !Number.isNaN(parsed) && parsed >= 1 ? parsed : undefined;
@@ -37,13 +56,13 @@ function getEnv(): {
   }
 
   // Comma-separated allowlist; default allows localhost in dev
-  const corsRaw = Bun.env.CORS_ORIGINS;
+  const corsRaw = process.env.CORS_ORIGINS;
   const CORS_ORIGINS =
     corsRaw != null && corsRaw !== ""
       ? corsRaw.split(",").map((s) => s.trim()).filter(Boolean)
       : ["http://localhost:1420", "http://localhost:5173", "http://localhost:3000"];
 
-  const rateLimitRaw = Bun.env.RATE_LIMIT_PER_MIN;
+  const rateLimitRaw = process.env.RATE_LIMIT_PER_MIN;
   const RATE_LIMIT_PER_MIN =
     rateLimitRaw != null && rateLimitRaw !== ""
       ? Number(rateLimitRaw)
@@ -55,7 +74,7 @@ function getEnv(): {
   }
 
   return {
-    CURSEFORGE_API_KEY: trimmed,
+    CURSEFORGE_API_KEY: trimmed, // normalized (trim + strip surrounding quotes)
     PORT: port,
     CURSEFORGE_GAME_ID,
     CORS_ORIGINS,

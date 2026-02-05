@@ -45,6 +45,20 @@ export function createModRoutes(cf: CurseForgeClient, orbis: OrbisClient) {
     return c.json(body);
   });
 
+  mod.get("/curseforge/:projectId/description", async (c) => {
+    const parsed = projectIdParam.safeParse(c.req.param());
+    if (!parsed.success) {
+      throw new AppError("VALIDATION_ERROR", "Invalid projectId", 400);
+    }
+
+    const description = await cf.getModDescription(parsed.data.projectId);
+    if (description == null) {
+      throw new AppError("NOT_FOUND", "Mod description not found", 404);
+    }
+
+    return c.json({ description });
+  });
+
   mod.get("/orbis/:resourceId", async (c) => {
     const parsed = resourceIdParam.safeParse(c.req.param());
     if (!parsed.success) {
