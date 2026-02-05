@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.2](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.1.1...hyghertales-v0.1.2) (2026-02-05)
+
+
+### Bug Fixes
+
+* release please and docker image ([330da23](https://github.com/MemerGamer/HygherTales/commit/330da23c073d659580f37de4f13f53a242b5b989))
+
 ## [0.1.1](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.1.0...hyghertales-v0.1.1) (2026-02-05)
 
 
