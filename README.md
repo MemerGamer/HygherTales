@@ -2,7 +2,7 @@
 
 ![HygherTales](./home.png)
 
-Mod launcher for Hytale. Browse and install mods from CurseForge and Orbis.place, manage profiles, and optionally launch the game.
+Mod launcher for Hytale. Browse and install mods from CurseForge and Orbis.place, manage profiles, and optionally launch the game(WIP).
 
 ## DISCLAIMER
 
