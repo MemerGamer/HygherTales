@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.3](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.1.2...hyghertales-v0.1.3) (2026-02-05)
+
+
+### Bug Fixes
+
+* updated RELEASE_CHECKLIST with CI secret instructions for CURSEFORGE_API_KEY and set environment for release jobs in workflow ([deb3a0f](https://github.com/MemerGamer/HygherTales/commit/deb3a0fc7907f05ba9e24557ff8b1b26a0d86084))
+
 ## [0.1.2](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.1.1...hyghertales-v0.1.2) (2026-02-05)
 
 
