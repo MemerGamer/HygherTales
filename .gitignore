@@ -141,4 +141,8 @@ vite.config.ts.timestamp-*
 # Tauri / Rust
 **/src-tauri/target/
 **/src-tauri/gen/
+**/src-tauri/binaries/
 **/Cargo.lock
+
+# Proxy embedded env (generated at build time)
+apps/proxy/src/.embedded-env.ts

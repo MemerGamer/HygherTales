@@ -24,7 +24,7 @@
     "targets": "all",
     "icon": ["icons/icon.png"],
     "resources": [],
-    "externalBin": [],
+    "externalBin": ["binaries/hyghertales-proxy"],
     "copyright": "",
     "category": "Utility",
     "shortDescription": "HygherTales mod manager",

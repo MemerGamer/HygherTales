@@ -42,6 +42,12 @@ jobs:
       - name: Build shared package
         run: bun run build --cwd packages/shared
 
+      - name: Build proxy sidecar (Windows)
+        run: bun run build:sidecar -- --target=windows
+        working-directory: apps/proxy
+        env:
+          CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
+
       - name: Sync version to Tauri
         run: |
           $version = (Get-Content package.json | ConvertFrom-Json).version
@@ -81,6 +87,12 @@ jobs:
 
       - name: Build shared package
         run: bun run build --cwd packages/shared
+
+      - name: Build proxy sidecar (macOS)
+        run: bun run build:sidecar -- --target=macos
+        working-directory: apps/proxy
+        env:
+          CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
 
       - name: Sync version to Tauri
         run: |
@@ -132,6 +144,12 @@ jobs:
 
       - name: Build shared package
         run: bun run build --cwd packages/shared
+
+      - name: Build proxy sidecar (Linux)
+        run: bun run build:sidecar -- --target=linux
+        working-directory: apps/proxy
+        env:
+          CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
 
       - name: Sync version to Tauri
         run: |

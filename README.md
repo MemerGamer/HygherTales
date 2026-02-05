@@ -27,6 +27,11 @@ Mod launcher for Hytale. Browse and install mods from CurseForge and Orbis.place
 
 ---
 
+## Installation
+
+Pick the latest release from [releases](https://github.com/MemerGamer/HygherTales/releases) and download the appropriate binary for your platform.
+
+## Development guide
 ## Prerequisites
 
 - [Bun](https://bun.sh) - JavaScript runtime

@@ -3,8 +3,10 @@
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Mutex;
 use std::{env, fs};
-use tauri::Manager;
+use tauri::{AppHandle, Manager};
+use tauri_plugin_shell::ShellExt;
 
 #[derive(serde::Serialize)]
 struct EnsureModsDirResult {
@@ -45,6 +47,19 @@ pub struct InstalledModRecord {
 
 const INSTALLED_MODS_FILENAME: &str = "installed_mods.json";
 const PROFILES_FILENAME: &str = "profiles.json";
+
+// Global state for the proxy sidecar process
+struct ProxyState {
+    child: Option<std::process::Child>,
+}
+
+impl ProxyState {
+    fn new() -> Self {
+        Self { child: None }
+    }
+}
+
+static PROXY_STATE: Mutex<Option<ProxyState>> = Mutex::new(None);
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -469,6 +484,87 @@ fn open_path_in_file_manager(path: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Start the proxy sidecar process. Returns true if started successfully.
+#[tauri::command]
+fn start_proxy_sidecar(app: AppHandle) -> Result<bool, String> {
+    // Initialize proxy state if needed
+    {
+        let mut state = PROXY_STATE.lock().unwrap();
+        if state.is_none() {
+            *state = Some(ProxyState::new());
+        }
+    }
+
+    // Check if already running
+    {
+        let mut state = PROXY_STATE.lock().unwrap();
+        if let Some(proxy_state) = state.as_mut() {
+            if let Some(ref mut child) = proxy_state.child {
+                // Check if still running
+                match child.try_wait() {
+                    Ok(None) => {
+                        // Still running
+                        return Ok(true);
+                    }
+                    _ => {
+                        // Not running anymore, clear it
+                        proxy_state.child = None;
+                    }
+                }
+            }
+        }
+    }
+
+    // Start the sidecar
+    let sidecar_command = app
+        .shell()
+        .sidecar("hyghertales-proxy")
+        .map_err(|e| format!("Failed to create sidecar command: {}", e))?;
+
+    let (mut rx, child) = sidecar_command
+        .spawn()
+        .map_err(|e| format!("Failed to spawn sidecar: {}", e))?;
+
+    // Log output in background
+    tauri::async_runtime::spawn(async move {
+        while let Some(event) = rx.recv().await {
+            match event {
+                tauri_plugin_shell::process::CommandEvent::Stdout(line) => {
+                    println!("[proxy] {}", String::from_utf8_lossy(&line));
+                }
+                tauri_plugin_shell::process::CommandEvent::Stderr(line) => {
+                    eprintln!("[proxy] {}", String::from_utf8_lossy(&line));
+                }
+                tauri_plugin_shell::process::CommandEvent::Terminated(payload) => {
+                    println!("[proxy] Process terminated with code: {:?}", payload.code);
+                    break;
+                }
+                _ => {}
+            }
+        }
+    });
+
+    // Store the child handle (though we can't easily stop it with the shell plugin)
+    // The process will be killed when the app exits
+    println!("[proxy] Sidecar started with pid: {}", child.pid());
+
+    Ok(true)
+}
+
+/// Stop the proxy sidecar process.
+#[tauri::command]
+fn stop_proxy_sidecar() -> Result<(), String> {
+    let mut state = PROXY_STATE.lock().unwrap();
+    if let Some(proxy_state) = state.as_mut() {
+        if let Some(mut child) = proxy_state.child.take() {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Ok(());
+        }
+    }
+    Ok(())
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -491,6 +587,8 @@ pub fn run() {
             write_text_file,
             read_text_file,
             launch_game,
+            start_proxy_sidecar,
+            stop_proxy_sidecar,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
