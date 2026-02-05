@@ -57,7 +57,8 @@ jobs:
         shell: pwsh
 
       - name: Build desktop (Windows)
-        run: bun run build --cwd apps/desktop
+        run: bun run build
+        working-directory: apps/desktop
 
       - name: Upload Windows artifacts to release
         run: |
@@ -106,7 +107,8 @@ jobs:
           "
 
       - name: Build desktop (macOS)
-        run: bun run build --cwd apps/desktop
+        run: bun run build
+        working-directory: apps/desktop
 
       - name: Upload macOS artifacts to release
         run: |
@@ -163,7 +165,8 @@ jobs:
           "
 
       - name: Build desktop (Linux)
-        run: bun run build --cwd apps/desktop
+        run: bun run build
+        working-directory: apps/desktop
 
       - name: Upload Linux artifacts to release
         run: |

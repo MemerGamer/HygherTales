@@ -11,10 +11,12 @@ COPY package.json bun.lock* ./
 COPY packages/shared packages/shared
 COPY apps/proxy apps/proxy
 
-RUN bun install --frozen-lockfile
+# Partial workspace copy: lockfile is for full monorepo, so we install without frozen lockfile
+RUN bun install
 
-RUN bun run build --cwd packages/shared
-RUN bun run build --cwd apps/proxy
+# Build only shared and proxy (do not run root build script; it would try to build desktop too)
+RUN cd packages/shared && bun run build
+RUN cd apps/proxy && bun run build
 
 # Production image
 FROM oven/bun:1.3-slim
