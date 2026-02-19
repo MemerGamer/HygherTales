@@ -67,6 +67,8 @@ run("bun", ["run", "build:sidecar", "--", `--target=${target}`], {
 run("bun", ["run", "generate-icon-ico"], { cwd: join(root, "apps/desktop") });
 
 // 4. Desktop app (bundles the sidecar from apps/desktop/src-tauri/binaries)
-run("bun", ["run", "build"], { cwd: join(root, "apps/desktop") });
+// On Linux, allow linuxdeploy AppImage to run without FUSE (extract-and-run)
+const desktopEnv = target === "linux" ? { APPIMAGE_EXTRACT_AND_RUN: "1" } : {};
+run("bun", ["run", "build"], { cwd: join(root, "apps/desktop"), env: desktopEnv });
 
 console.log("\nDone. Bundles are in apps/desktop/src-tauri/target/release/bundle/");
