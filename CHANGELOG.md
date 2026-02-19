@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.2.0...hyghertales-v0.3.0) (2026-02-19)
+
+
+### Features
+
+* added monolith build script and update CI dependencies ([d7dc7e7](https://github.com/MemerGamer/HygherTales/commit/d7dc7e7ef9360c2ff5a69c30ade50b0b6201bbec))
+* enhanced monolith build script for Linux compatibility ([12917d3](https://github.com/MemerGamer/HygherTales/commit/12917d36f104fa75a72b09632858e6dca2c1487c))
+* release ([2461cc1](https://github.com/MemerGamer/HygherTales/commit/2461cc176e2e530c86d7f57976cb15d6eaee6138))
+
 ## [0.2.0](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.1.8...hyghertales-v0.2.0) (2026-02-19)
 
 
