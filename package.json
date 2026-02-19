@@ -12,6 +12,7 @@
     "dev:proxy": "bun run --cwd apps/proxy dev",
     "dev:all": "cd packages/shared && bun run build && cd ../.. && concurrently --names proxy,desktop -c blue,green \"bun run --cwd apps/proxy dev\" \"bun run --cwd apps/desktop dev\"",
     "build": "cd packages/shared && bun run build && cd ../.. && cd apps/proxy && bun run build && cd ../.. && cd apps/desktop && bun run build",
+    "build:monolith": "node scripts/build-monolith.mjs",
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,json,md}\""

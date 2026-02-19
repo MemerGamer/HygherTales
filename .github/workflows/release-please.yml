@@ -153,7 +153,7 @@ jobs:
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libfuse2
 
       - name: Setup Bun
         uses: "oven-sh/setup-bun@v2"
@@ -192,6 +192,9 @@ jobs:
       - name: Build desktop (Linux)
         run: bun run build
         working-directory: apps/desktop
+        env:
+          # Allow linuxdeploy AppImage to run in CI without FUSE (extract-and-run)
+          APPIMAGE_EXTRACT_AND_RUN: 1
 
       - name: Upload Linux artifacts to release
         run: |
