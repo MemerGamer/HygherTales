@@ -145,4 +145,3 @@ vite.config.ts.timestamp-*
 **/Cargo.lock
 
 # Proxy embedded env (generated at build time)
-apps/proxy/src/.embedded-env.ts

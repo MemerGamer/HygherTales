@@ -50,7 +50,7 @@ const PROFILES_FILENAME: &str = "profiles.json";
 
 // Global state for the proxy sidecar process
 struct ProxyState {
-    child: Option<std::process::Child>,
+    child: Option<tauri_plugin_shell::process::CommandChild>,
 }
 
 impl ProxyState {
@@ -497,20 +497,10 @@ fn start_proxy_sidecar(app: AppHandle) -> Result<bool, String> {
 
     // Check if already running
     {
-        let mut state = PROXY_STATE.lock().unwrap();
-        if let Some(proxy_state) = state.as_mut() {
-            if let Some(ref mut child) = proxy_state.child {
-                // Check if still running
-                match child.try_wait() {
-                    Ok(None) => {
-                        // Still running
-                        return Ok(true);
-                    }
-                    _ => {
-                        // Not running anymore, clear it
-                        proxy_state.child = None;
-                    }
-                }
+        let state = PROXY_STATE.lock().unwrap();
+        if let Some(ref proxy_state) = *state {
+            if proxy_state.child.is_some() {
+                return Ok(true);
             }
         }
     }
@@ -525,7 +515,7 @@ fn start_proxy_sidecar(app: AppHandle) -> Result<bool, String> {
         .spawn()
         .map_err(|e| format!("Failed to spawn sidecar: {}", e))?;
 
-    // Log output in background
+    // Log output in background (only hold rx; child is stored in state)
     tauri::async_runtime::spawn(async move {
         while let Some(event) = rx.recv().await {
             match event {
@@ -544,9 +534,14 @@ fn start_proxy_sidecar(app: AppHandle) -> Result<bool, String> {
         }
     });
 
-    // Store the child handle (though we can't easily stop it with the shell plugin)
-    // The process will be killed when the app exits
-    println!("[proxy] Sidecar started with pid: {}", child.pid());
+    // Store the child handle so stop_proxy_sidecar can kill it
+    {
+        let mut state = PROXY_STATE.lock().unwrap();
+        if let Some(proxy_state) = state.as_mut() {
+            proxy_state.child = Some(child);
+        }
+    }
+    println!("[proxy] Sidecar started");
 
     Ok(true)
 }
@@ -556,9 +551,8 @@ fn start_proxy_sidecar(app: AppHandle) -> Result<bool, String> {
 fn stop_proxy_sidecar() -> Result<(), String> {
     let mut state = PROXY_STATE.lock().unwrap();
     if let Some(proxy_state) = state.as_mut() {
-        if let Some(mut child) = proxy_state.child.take() {
+        if let Some(child) = proxy_state.child.take() {
             let _ = child.kill();
-            let _ = child.wait();
             return Ok(());
         }
     }

@@ -87,28 +87,26 @@ const entryPoint = join(import.meta.dir, "src", "index.ts");
 console.log(`Compiling ${entryPoint} to ${outputPath}...`);
 console.log(`Bun target: ${bunTarget}`);
 
-// Use Bun.spawn to run the build command
-const buildProcess = Bun.spawn(
-  [
-    "bun",
-    "build",
-    entryPoint,
-    "--compile",
-    "--target",
-    bunTarget,
-    "--outfile",
-    outputPath,
-  ],
-  {
-    stdout: "inherit",
-    stderr: "inherit",
-    env: {
-      ...process.env,
-      // Pass the embedded key through the environment as well for build-time access
-      EMBEDDED_CURSEFORGE_API_KEY: apiKey,
-    },
-  }
-);
+// Build args: --windows-hide-console so the sidecar does not open a console window on Windows
+const buildArgs = [
+  "bun",
+  "build",
+  entryPoint,
+  "--compile",
+  "--target",
+  bunTarget,
+  "--outfile",
+  outputPath,
+];
+if (target === "windows") {
+  buildArgs.push("--windows-hide-console");
+}
+
+const buildProcess = Bun.spawn(buildArgs, {
+  stdout: "inherit",
+  stderr: "inherit",
+  cwd: import.meta.dir,
+});
 
 const exitCode = await buildProcess.exited;
 
