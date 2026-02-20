@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.3.0...hyghertales-v0.4.0) (2026-02-20)
+
+
+### Features
+
+* improved mod import handling and enable FUSE for AppImage builds ([5758714](https://github.com/MemerGamer/HygherTales/commit/5758714677e9c8e010e43e3c5264d5ce9f24be34))
+
 ## [0.3.0](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.2.0...hyghertales-v0.3.0) (2026-02-19)
 
 
