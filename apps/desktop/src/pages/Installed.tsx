@@ -521,7 +521,9 @@ export function Installed({ modsDirPath, proxyBaseUrl }: InstalledProps) {
       }
       let currentMods = await readInstalledMods();
       const enabledIds: number[] = [];
+      const importSkipped: Array<{ name: string; reason: string }> = [];
       for (const entry of parsed.mods as ExportedProfileMod[]) {
+        const entryName = entry.name || entry.slug || "unknown mod";
         const match = currentMods.find((m) => {
           if (m.provider !== entry.provider) return false;
           if (entry.provider === "curseforge" && entry.projectId != null)
@@ -534,69 +536,83 @@ export function Installed({ modsDirPath, proxyBaseUrl }: InstalledProps) {
           enabledIds.push(match.id);
           continue;
         }
-        if (entry.provider === "curseforge" && entry.fileId == null && entry.projectId != null) {
-          const res = await getModFiles(proxyBaseUrl, "curseforge", String(entry.projectId));
-          const latest = getLatestFile("curseforge", res.files);
-          if (!latest?.fileId) continue;
-          entry.fileId = latest.fileId;
+        try {
+          if (entry.provider === "curseforge" && entry.fileId == null && entry.projectId != null) {
+            const res = await getModFiles(proxyBaseUrl, "curseforge", String(entry.projectId));
+            const latest = getLatestFile("curseforge", res.files);
+            if (!latest?.fileId) {
+              importSkipped.push({ name: entryName, reason: "no file found on CurseForge" });
+              continue;
+            }
+            entry.fileId = latest.fileId;
+          }
+          if (entry.provider === "orbis" && (entry.versionId == null || entry.fileIndex == null) && entry.resourceId != null) {
+            const res = await getModFiles(proxyBaseUrl, "orbis", entry.resourceId);
+            const latest = getLatestFile("orbis", res.files);
+            if (!latest?.versionId || latest.fileIndex == null) {
+              importSkipped.push({ name: entryName, reason: "no file found on Orbis" });
+              continue;
+            }
+            entry.versionId = latest.versionId;
+            entry.fileIndex = latest.fileIndex;
+          }
+          let url: string;
+          if (entry.provider === "curseforge" && entry.projectId != null && entry.fileId != null) {
+            const r = await getDownloadUrlCurseForge(proxyBaseUrl, entry.projectId, entry.fileId);
+            url = r.url;
+          } else if (
+            entry.provider === "orbis" &&
+            entry.resourceId != null &&
+            entry.versionId != null &&
+            entry.fileIndex != null
+          ) {
+            const r = await getDownloadUrlOrbis(
+              proxyBaseUrl,
+              entry.resourceId,
+              entry.versionId,
+              entry.fileIndex
+            );
+            url = r.url;
+          } else {
+            importSkipped.push({ name: entryName, reason: "missing identifier to resolve download URL" });
+            continue;
+          }
+          const baseDir = modsDirPath.replace(/\\/g, "/").replace(/\/$/, "");
+          const fileName = `${entry.slug || "mod"}.jar`;
+          const destPath = `${baseDir}/${fileName}`;
+          const finalPath = await downloadFileToPath(url, destPath);
+          const installedFilename = finalPath.replace(/^.*[/\\]/, "");
+          const newId = nextId(currentMods);
+          const newRecord: InstalledModRecord = {
+            id: newId,
+            provider: entry.provider,
+            projectId: entry.provider === "curseforge" ? entry.projectId : null,
+            resourceId: entry.provider === "orbis" ? entry.resourceId : null,
+            slug: entry.slug,
+            name: entry.name,
+            installedFileId:
+              entry.provider === "curseforge"
+                ? entry.fileId ?? null
+                : entry.versionId != null && entry.fileIndex != null
+                  ? `${entry.versionId}:${entry.fileIndex}`
+                  : null,
+            installedFilename,
+            installedAt: new Date().toISOString(),
+            sourceUrl:
+              entry.provider === "orbis"
+                ? `https://www.orbis.place/mod/${entry.slug}`
+                : undefined,
+            enabled: true,
+          };
+          currentMods = [...currentMods, newRecord];
+          await writeInstalledMods(currentMods);
+          enabledIds.push(newId);
+        } catch (e) {
+          const reason = e instanceof ApiError && e.status === 503
+            ? "download restricted by CurseForge distribution settings"
+            : e instanceof Error ? e.message : String(e);
+          importSkipped.push({ name: entryName, reason });
         }
-        if (entry.provider === "orbis" && (entry.versionId == null || entry.fileIndex == null) && entry.resourceId != null) {
-          const res = await getModFiles(proxyBaseUrl, "orbis", entry.resourceId);
-          const latest = getLatestFile("orbis", res.files);
-          if (!latest?.versionId || latest.fileIndex == null) continue;
-          entry.versionId = latest.versionId;
-          entry.fileIndex = latest.fileIndex;
-        }
-        let url: string;
-        if (entry.provider === "curseforge" && entry.projectId != null && entry.fileId != null) {
-          const r = await getDownloadUrlCurseForge(proxyBaseUrl, entry.projectId, entry.fileId);
-          url = r.url;
-        } else if (
-          entry.provider === "orbis" &&
-          entry.resourceId != null &&
-          entry.versionId != null &&
-          entry.fileIndex != null
-        ) {
-          const r = await getDownloadUrlOrbis(
-            proxyBaseUrl,
-            entry.resourceId,
-            entry.versionId,
-            entry.fileIndex
-          );
-          url = r.url;
-        } else {
-          continue;
-        }
-        const baseDir = modsDirPath.replace(/\\/g, "/").replace(/\/$/, "");
-        const fileName = `${entry.slug || "mod"}.jar`;
-        const destPath = `${baseDir}/${fileName}`;
-        const finalPath = await downloadFileToPath(url, destPath);
-        const installedFilename = finalPath.replace(/^.*[/\\]/, "");
-        const newId = nextId(currentMods);
-        const newRecord: InstalledModRecord = {
-          id: newId,
-          provider: entry.provider,
-          projectId: entry.provider === "curseforge" ? entry.projectId : null,
-          resourceId: entry.provider === "orbis" ? entry.resourceId : null,
-          slug: entry.slug,
-          name: entry.name,
-          installedFileId:
-            entry.provider === "curseforge"
-              ? entry.fileId ?? null
-              : entry.versionId != null && entry.fileIndex != null
-                ? `${entry.versionId}:${entry.fileIndex}`
-                : null,
-          installedFilename,
-          installedAt: new Date().toISOString(),
-          sourceUrl:
-            entry.provider === "orbis"
-              ? `https://www.orbis.place/mod/${entry.slug}`
-              : undefined,
-          enabled: true,
-        };
-        currentMods = [...currentMods, newRecord];
-        await writeInstalledMods(currentMods);
-        enabledIds.push(newId);
       }
       setMods(currentMods);
       const newProfile = createProfile(
@@ -645,6 +661,11 @@ export function Installed({ modsDirPath, proxyBaseUrl }: InstalledProps) {
       }
       await writeInstalledMods(finalMods);
       setMods(finalMods);
+      if (importSkipped.length > 0) {
+        setExportImportError(
+          `Import complete. ${importSkipped.length} mod(s) could not be downloaded:\n${importSkipped.map((s) => `• ${s.name}: ${s.reason}`).join("\n")}`
+        );
+      }
     } catch (e) {
       setExportImportError(String(e));
     }
@@ -812,6 +833,7 @@ export function Installed({ modsDirPath, proxyBaseUrl }: InstalledProps) {
               ? e.body?.message ?? e.message
               : String(e);
         setUpdateError(msg);
+        throw new Error(msg);
       } finally {
         setUpdatingIds((s) => {
           const next = new Set(s);
@@ -834,8 +856,31 @@ export function Installed({ modsDirPath, proxyBaseUrl }: InstalledProps) {
     const toUpdate = mods.filter(
       (m) => m.id != null && !m.pinned && updateMap[updateKey(m)] != null
     );
+    setUpdateError(null);
+    setUpdateSuccess(null);
+    const succeeded: string[] = [];
+    const failed: Array<{ name: string; reason: string }> = [];
     for (const mod of toUpdate) {
-      await updateOne(mod);
+      try {
+        await updateOne(mod);
+        succeeded.push(mod.name);
+      } catch (e) {
+        failed.push({ name: mod.name, reason: e instanceof Error ? e.message : String(e) });
+      }
+    }
+    if (failed.length === 0) {
+      setUpdateError(null);
+      setUpdateSuccess(`Updated ${succeeded.length} mod(s) successfully.`);
+    } else if (succeeded.length === 0) {
+      setUpdateSuccess(null);
+      setUpdateError(
+        `All ${failed.length} update(s) failed:\n${failed.map((f) => `• ${f.name}: ${f.reason}`).join("\n")}`
+      );
+    } else {
+      setUpdateSuccess(`Updated ${succeeded.length} mod(s) successfully.`);
+      setUpdateError(
+        `${failed.length} update(s) failed:\n${failed.map((f) => `• ${f.name}: ${f.reason}`).join("\n")}`
+      );
     }
   }, [mods, updateMap, updateOne]);
 
@@ -967,6 +1012,7 @@ export function Installed({ modsDirPath, proxyBaseUrl }: InstalledProps) {
         <div
           className="p-3 mb-4 bg-[var(--color-danger)] border border-[rgba(220,80,80,0.6)] rounded text-[#ffb3b3]"
           role="alert"
+          style={{ whiteSpace: "pre-line" }}
         >
           {updateError}
         </div>
@@ -983,6 +1029,7 @@ export function Installed({ modsDirPath, proxyBaseUrl }: InstalledProps) {
         <div
           className="p-3 mb-4 bg-[var(--color-danger)] border border-[rgba(220,80,80,0.6)] rounded text-[#ffb3b3]"
           role="alert"
+          style={{ whiteSpace: "pre-line" }}
         >
           {exportImportError}
         </div>
@@ -1059,7 +1106,7 @@ export function Installed({ modsDirPath, proxyBaseUrl }: InstalledProps) {
                     <Button
                       size="sm"
                       variant="primary"
-                      onClick={() => updateOne(mod)}
+                      onClick={() => updateOne(mod).catch(() => {})}
                       disabled={isUpdating}
                       isLoading={isUpdating}
                     >

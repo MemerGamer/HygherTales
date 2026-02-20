@@ -189,6 +189,11 @@ jobs:
         run: bun run generate-icon-ico
         working-directory: apps/desktop
 
+      - name: Enable FUSE for AppImage
+        run: |
+          sudo modprobe fuse
+          sudo chmod a+rw /dev/fuse
+
       - name: Build desktop (Linux)
         run: bun run build
         working-directory: apps/desktop
