@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.1](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.4.0...hyghertales-v0.4.1) (2026-02-24)
+
+
+### Bug Fixes
+
+* improved proxy sidecar handling and updated CI configuration ([07c18f3](https://github.com/MemerGamer/HygherTales/commit/07c18f34715d41d8a6d2d3d537518effb7012732))
+
 ## [0.4.0](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.3.0...hyghertales-v0.4.0) (2026-02-20)
 
 
