@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
 import { Home } from "./pages/Home";
 import { Browse } from "./pages/Browse";
 import { Installed } from "./pages/Installed";
@@ -27,15 +26,13 @@ function App() {
     setSettings(s);
   }, []);
 
-  // Start proxy sidecar on app mount
+  // Wait for the proxy sidecar (auto-started by Rust on app boot) to be ready
   useEffect(() => {
     let cancelled = false;
 
-    async function startProxyAndWaitForHealth() {
+    async function waitForProxyHealth() {
       try {
-        console.log("[app] Starting proxy sidecar...");
-        await invoke("start_proxy_sidecar");
-        console.log("[app] Proxy sidecar started, waiting for health check...");
+        console.log("[app] Waiting for proxy health check...");
 
         // Wait for proxy to be ready (health check with retries)
         const maxRetries = 30; // 30 seconds max
@@ -62,7 +59,7 @@ function App() {
         }
       } catch (err) {
         if (!cancelled) {
-          console.error("[app] Failed to start proxy:", err);
+          console.error("[app] Proxy health check failed:", err);
           setProxyError(
             err instanceof Error ? err.message : "Failed to start proxy server"
           );
@@ -70,7 +67,7 @@ function App() {
       }
     }
 
-    startProxyAndWaitForHealth();
+    waitForProxyHealth();
 
     return () => {
       cancelled = true;

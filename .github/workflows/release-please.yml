@@ -200,6 +200,8 @@ jobs:
         env:
           # Allow linuxdeploy AppImage to run in CI without FUSE (extract-and-run)
           APPIMAGE_EXTRACT_AND_RUN: 1
+          # Prevent linuxdeploy from stripping binaries (avoids "failed to run linuxdeploy" in CI)
+          NO_STRIP: true
 
       - name: Upload Linux artifacts to release
         run: |

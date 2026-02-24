@@ -484,9 +484,8 @@ fn open_path_in_file_manager(path: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Start the proxy sidecar process. Returns true if started successfully.
-#[tauri::command]
-fn start_proxy_sidecar(app: AppHandle) -> Result<bool, String> {
+/// Internal helper: spawn the proxy sidecar. Idempotent — no-op if already running.
+fn spawn_proxy_sidecar(app: &AppHandle) -> Result<(), String> {
     // Initialize proxy state if needed
     {
         let mut state = PROXY_STATE.lock().unwrap();
@@ -495,17 +494,17 @@ fn start_proxy_sidecar(app: AppHandle) -> Result<bool, String> {
         }
     }
 
-    // Check if already running
+    // No-op if already running
     {
         let state = PROXY_STATE.lock().unwrap();
         if let Some(ref proxy_state) = *state {
             if proxy_state.child.is_some() {
-                return Ok(true);
+                return Ok(());
             }
         }
     }
 
-    // Start the sidecar
+    // Spawn the sidecar
     let sidecar_command = app
         .shell()
         .sidecar("hyghertales-proxy")
@@ -515,7 +514,7 @@ fn start_proxy_sidecar(app: AppHandle) -> Result<bool, String> {
         .spawn()
         .map_err(|e| format!("Failed to spawn sidecar: {}", e))?;
 
-    // Log output in background (only hold rx; child is stored in state)
+    // Log output in background
     tauri::async_runtime::spawn(async move {
         while let Some(event) = rx.recv().await {
             match event {
@@ -534,7 +533,7 @@ fn start_proxy_sidecar(app: AppHandle) -> Result<bool, String> {
         }
     });
 
-    // Store the child handle so stop_proxy_sidecar can kill it
+    // Store the child handle so it can be killed on exit
     {
         let mut state = PROXY_STATE.lock().unwrap();
         if let Some(proxy_state) = state.as_mut() {
@@ -543,7 +542,13 @@ fn start_proxy_sidecar(app: AppHandle) -> Result<bool, String> {
     }
     println!("[proxy] Sidecar started");
 
-    Ok(true)
+    Ok(())
+}
+
+/// Start the proxy sidecar process. Returns true if started (or already running).
+#[tauri::command]
+fn start_proxy_sidecar(app: AppHandle) -> Result<bool, String> {
+    spawn_proxy_sidecar(&app).map(|_| true)
 }
 
 /// Stop the proxy sidecar process.
@@ -563,6 +568,26 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
+        .setup(|app| {
+            // Auto-start the proxy sidecar as a hidden subprocess on app boot.
+            // This makes the app behave as a true monolith — no frontend call required.
+            let handle = app.handle().clone();
+            if let Err(e) = spawn_proxy_sidecar(&handle) {
+                eprintln!("[proxy] Auto-start failed: {e}");
+            }
+            Ok(())
+        })
+        .on_window_event(|_window, event| {
+            // Kill the sidecar when the last window is destroyed (app exit).
+            if let tauri::WindowEvent::Destroyed = event {
+                let mut state = PROXY_STATE.lock().unwrap();
+                if let Some(proxy_state) = state.as_mut() {
+                    if let Some(child) = proxy_state.child.take() {
+                        let _ = child.kill();
+                    }
+                }
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             get_default_hytale_mods_paths,
             ensure_mods_dir,
