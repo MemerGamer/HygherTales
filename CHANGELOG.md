@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.2](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.6.1...hyghertales-v0.6.2) (2026-02-28)
+
+
+### Bug Fixes
+
+* **ci:** install flatpak and flatpak-builder in GitHub Actions for Flatpak builds ([7682901](https://github.com/MemerGamer/HygherTales/commit/7682901d3d2dd35f2dc9d0c8fc1891857f8269aa))
+
 ## [0.6.1](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.6.0...hyghertales-v0.6.1) (2026-02-28)
 
 
