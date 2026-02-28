@@ -209,22 +209,10 @@ jobs:
           chmod +x ~/.cache/tauri/linuxdeploy-x86_64.AppImage
 
           # Locate the squashfs filesystem inside the AppImage (no FUSE required).
-          # Parse the ELF section-header table to find where the runtime binary ends,
-          # then search for the squashfs magic bytes from that point onward.
-          # Scanning from byte 0 produces false positives (hsqs appears inside the ELF itself).
-          OFFSET=$(python3 -c "
-import struct
-path = '$HOME/.cache/tauri/linuxdeploy-x86_64.AppImage'
-data = open(path, 'rb').read()
-e_shoff     = struct.unpack_from('<Q', data, 40)[0]
-e_shentsize = struct.unpack_from('<H', data, 58)[0]
-e_shnum     = struct.unpack_from('<H', data, 60)[0]
-min_off = (e_shoff + e_shentsize * e_shnum) if e_shnum else 65536
-for off in range(min_off, len(data) - 4):
-    if data[off:off+4] in (b'hsqs', b'sqsh'):
-        print(off)
-        break
-          ")
+          # Parse ELF section-header fields to find where the runtime ends, then search
+          # forward for the squashfs magic. Scanning from byte 0 gives a false positive
+          # (hsqs appears inside the ELF binary itself at ~36 KB).
+          OFFSET=$(python3 -c "import struct; d=open('$HOME/.cache/tauri/linuxdeploy-x86_64.AppImage','rb').read(); s=struct.unpack_from; n=s('<H',d,60)[0]; o=s('<Q',d,40)[0]+s('<H',d,58)[0]*n if n else 65536; print(next(i for i in range(o,len(d)-4) if d[i:i+4] in(b'hsqs',b'sqsh')))")
           echo "squashfs offset: $OFFSET"
 
           # Extract, patch patchelf, repack.
