@@ -144,4 +144,7 @@ vite.config.ts.timestamp-*
 **/src-tauri/binaries/
 **/Cargo.lock
 
+# Flatpak staging (generated in CI)
+apps/desktop/flatpak/files/
+
 # Proxy embedded env (generated at build time)

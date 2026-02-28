@@ -1,0 +1,58 @@
+id: com.hyghertales.desktop
+
+runtime: org.gnome.Platform
+runtime-version: '46'
+sdk: org.gnome.Sdk
+
+command: hyghertales-desktop
+
+finish-args:
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  - --share=ipc
+  - --share=network
+  - --filesystem=home
+
+modules:
+  - name: hyghertales
+    buildsystem: simple
+
+    sources:
+      - type: file
+        path: files/app.deb
+      - type: file
+        path: com.hyghertales.desktop.metainfo.xml
+
+    build-commands:
+      - set -e
+
+      # Extract the .deb
+      - mkdir deb-extract
+      - ar -x app.deb --output deb-extract
+      - tar -C deb-extract -xf deb-extract/data.tar.gz
+
+      # Main binary
+      - install -Dm755 deb-extract/usr/bin/hyghertales-desktop /app/bin/hyghertales-desktop
+
+      # Sidecar and any bundled libs placed by Tauri under /usr/lib/<app>/
+      - |
+        if [ -d deb-extract/usr/lib/hyghertales-desktop ]; then
+          mkdir -p /app/lib/hyghertales-desktop
+          cp -r deb-extract/usr/lib/hyghertales-desktop/. /app/lib/hyghertales-desktop/
+          find /app/lib/hyghertales-desktop -type f -exec chmod 755 {} \;
+        fi
+
+      # Desktop file — rewrite Icon= to the Flatpak app ID
+      - sed -i 's|^Icon=.*|Icon=com.hyghertales.desktop|' deb-extract/usr/share/applications/hyghertales-desktop.desktop
+      - install -Dm644 deb-extract/usr/share/applications/hyghertales-desktop.desktop /app/share/applications/com.hyghertales.desktop.desktop
+
+      # Icons (copy every resolution Tauri generated, rename to app ID)
+      - |
+        find deb-extract/usr/share/icons/hicolor -name '*.png' | while read f; do
+          size_dir=$(echo "$f" | sed 's|.*/hicolor/\([^/]*\)/.*|\1|')
+          install -Dm644 "$f" "/app/share/icons/hicolor/$size_dir/apps/com.hyghertales.desktop.png" || true
+        done
+
+      # AppStream metainfo
+      - install -Dm644 com.hyghertales.desktop.metainfo.xml /app/share/metainfo/com.hyghertales.desktop.metainfo.xml

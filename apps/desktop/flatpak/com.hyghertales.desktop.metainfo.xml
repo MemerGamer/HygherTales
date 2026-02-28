@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.hyghertales.desktop</id>
+  <name>HygherTales</name>
+  <summary>HygherTales mod manager for Hytale</summary>
+  <description>
+    <p>Browse and manage CurseForge mods for Hytale.</p>
+  </description>
+  <url type="homepage">https://github.com/MemerGamer/HygherTales</url>
+  <releases>
+    <release version="0.5.1" date="2025-01-01"/>
+  </releases>
+  <content_rating type="oars-1.1"/>
+</component>

@@ -137,7 +137,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  build-linux:
+  build-linux-packages:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created }}
     runs-on: ubuntu-22.04
@@ -153,7 +153,7 @@ jobs:
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libfuse2
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
       - name: Setup Bun
         uses: "oven-sh/setup-bun@v2"
@@ -189,74 +189,88 @@ jobs:
         run: bun run generate-icon-ico
         working-directory: apps/desktop
 
-      - name: Enable FUSE for AppImage
-        run: |
-          sudo modprobe fuse
-          sudo chmod a+rw /dev/fuse
-
-      - name: Patch linuxdeploy patchelf (fix Bun sidecar corruption)
-        # linuxdeploy bundles patchelf 0.8 which corrupts large Bun self-contained binaries.
-        # After patchelf 0.8 modifies the sidecar, ldd fails on it and the GTK plugin aborts.
-        # Fix: use --appimage-extract to unpack linuxdeploy, replace patchelf with the system
-        # version (0.14+), then replace the AppImage with a wrapper script pointing at AppRun.
-        # No squashfs-tools or Python needed; --appimage-extract is built into every AppImage.
-        run: |
-          set -euo pipefail
-          mkdir -p ~/.cache/tauri && cd ~/.cache/tauri
-
-          curl -sSfL -o linuxdeploy-x86_64.AppImage \
-            "https://github.com/tauri-apps/binary-releases/releases/download/linuxdeploy/linuxdeploy-x86_64.AppImage"
-          chmod +x linuxdeploy-x86_64.AppImage
-
-          # Extract WITHOUT APPIMAGE_EXTRACT_AND_RUN: that env var causes the runtime to
-          # self-extract to a temp dir first, so squashfs-root would land there instead of here.
-          # --appimage-extract reads squashfs directly from the file; no FUSE needed.
-          ./linuxdeploy-x86_64.AppImage --appimage-extract
-
-          cp /usr/bin/patchelf squashfs-root/usr/bin/patchelf
-          echo "patchelf version: $(squashfs-root/usr/bin/patchelf --version)"
-
-          rm linuxdeploy-x86_64.AppImage
-          # Build wrapper using multiple printf calls (avoids heredoc-in-YAML indentation issues).
-          # Wrapper calls linuxdeploy directly with explicit env, filtering AppImage runtime flags
-          # (--appimage-extract-and-run) that the extracted ELF binary does not understand.
-          {
-            printf '#!/bin/bash\n'
-            printf 'APPDIR="$HOME/.cache/tauri/squashfs-root"\n'
-            printf 'export APPDIR\n'
-            printf 'export PATH="$APPDIR/usr/bin:$PATH"\n'
-            printf 'export LD_LIBRARY_PATH="$APPDIR/usr/lib:${LD_LIBRARY_PATH:-}"\n'
-            printf 'args=()\n'
-            printf 'for arg in "$@"; do\n'
-            printf '  case "$arg" in\n'
-            printf '    --appimage-extract-and-run|--appimage-extract|--appimage-mount) ;;\n'
-            printf '    *) args+=("$arg") ;;\n'
-            printf '  esac\n'
-            printf 'done\n'
-            printf 'exec "$APPDIR/usr/bin/linuxdeploy" "${args[@]}"\n'
-          } > linuxdeploy-x86_64.AppImage
-          chmod +x linuxdeploy-x86_64.AppImage
-
-      - name: Compile desktop (Linux)
-        run: bun run build -- --no-bundle
-        working-directory: apps/desktop
-
       - name: Bundle deb and rpm
         run: bunx tauri bundle --bundles deb,rpm
         working-directory: apps/desktop
 
-      - name: Bundle AppImage
-        run: bunx tauri bundle --bundles appimage --verbose
-        working-directory: apps/desktop
-        env:
-          APPIMAGE_EXTRACT_AND_RUN: 1
-          NO_STRIP: true
-
-      - name: Upload Linux artifacts to release
+      - name: Upload deb and rpm to release
         run: |
           TAG="${{ needs.release-please.outputs.tag_name }}"
           BUNDLE="apps/desktop/src-tauri/target/release/bundle"
-          find "$BUNDLE" -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o -name "*.AppImage.tar.gz" -o -name "*.AppImage.tar.gz.sig" \) -exec gh release upload "$TAG" {} \;
+          find "$BUNDLE" -type f \( -name "*.deb" -o -name "*.rpm" \) -exec gh release upload "$TAG" {} \;
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-linux-flatpak:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-22.04
+    environment: release
+    steps:
+      - uses: "actions/checkout@v4"
+
+      - name: Mark repo as safe for git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Setup Bun
+        uses: "oven-sh/setup-bun@v2"
+
+      - name: Install Rust
+        uses: "dtolnay/rust-toolchain@stable"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build shared package
+        run: bun run build
+        working-directory: packages/shared
+
+      - name: Build proxy sidecar (Linux)
+        run: bun run build:sidecar -- --target=linux
+        working-directory: apps/proxy
+        env:
+          CURSEFORGE_API_KEY: ${{ secrets.CURSEFORGE_API_KEY }}
+
+      - name: Sync version to Tauri
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          node -e "
+            const fs = require('fs');
+            const path = 'apps/desktop/src-tauri/tauri.conf.json';
+            const c = JSON.parse(fs.readFileSync(path, 'utf8'));
+            c.version = process.env.VERSION;
+            fs.writeFileSync(path, JSON.stringify(c, null, 2));
+          "
+
+      - name: Generate icon.ico
+        run: bun run generate-icon-ico
+        working-directory: apps/desktop
+
+      - name: Build deb (Flatpak source)
+        run: bunx tauri bundle --bundles deb
+        working-directory: apps/desktop
+
+      - name: Stage .deb for Flatpak manifest
+        run: |
+          mkdir -p apps/desktop/flatpak/files
+          cp apps/desktop/src-tauri/target/release/bundle/deb/*.deb \
+             apps/desktop/flatpak/files/app.deb
+
+      - name: Build Flatpak
+        uses: "flatpak/flatpak-github-actions/flatpak-builder@v6"
+        with:
+          bundle: HygherTales.flatpak
+          manifest-path: apps/desktop/flatpak/com.hyghertales.desktop.yml
+          cache-key: flatpak-builder-${{ github.sha }}
+
+      - name: Upload Flatpak to release
+        run: |
+          gh release upload "${{ needs.release-please.outputs.tag_name }}" HygherTales.flatpak
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
