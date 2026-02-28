@@ -269,17 +269,19 @@ jobs:
           cp apps/desktop/src-tauri/target/release/bundle/deb/*.deb \
              apps/desktop/flatpak/files/app.deb
 
-      - name: Install flatpak-builder
+      - name: Install flatpak and flatpak-builder
         run: |
           sudo apt-get install -y flatpak flatpak-builder
-          sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
-      - name: Build Flatpak
-        uses: "flatpak/flatpak-github-actions/flatpak-builder@v6"
-        with:
-          bundle: HygherTales.flatpak
-          manifest-path: apps/desktop/flatpak/com.hyghertales.desktop.yml
-          cache-key: flatpak-builder-${{ github.sha }}
+      - name: Install Flatpak runtime (user)
+        run: flatpak install --user -y flathub org.gnome.Platform//47 org.gnome.Sdk//47
+
+      - name: Build Flatpak bundle
+        run: |
+          flatpak-builder --user --repo=flatpak-repo --disable-rofiles-fuse --force-clean \
+            flatpak-build-dir apps/desktop/flatpak/com.hyghertales.desktop.yml
+          flatpak build-bundle flatpak-repo HygherTales.flatpak com.hyghertales.desktop
 
       - name: Upload Flatpak to release
         run: |
