@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.5](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.6.4...hyghertales-v0.6.5) (2026-02-28)
+
+
+### Bug Fixes
+
+* **flatpak:** improve desktop file handling by dynamically locating .desktop files and updating icon references ([c23c2d1](https://github.com/MemerGamer/HygherTales/commit/c23c2d1478ce114703c080bd28ce536ec743129b))
+
 ## [0.6.4](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.6.3...hyghertales-v0.6.4) (2026-02-28)
 
 
