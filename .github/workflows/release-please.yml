@@ -153,7 +153,7 @@ jobs:
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libfuse2 squashfs-tools
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libfuse2
 
       - name: Setup Bun
         uses: "oven-sh/setup-bun@v2"
@@ -197,38 +197,26 @@ jobs:
       - name: Patch linuxdeploy patchelf (fix Bun sidecar corruption)
         # linuxdeploy bundles patchelf 0.8 which corrupts large Bun self-contained binaries.
         # After patchelf 0.8 modifies the sidecar, ldd fails on it and the GTK plugin aborts.
-        # Fix: extract linuxdeploy, replace its patchelf with the system version (0.14+),
-        # and repack it so Tauri picks up the patched copy from cache.
+        # Fix: use --appimage-extract to unpack linuxdeploy, replace patchelf with the system
+        # version (0.14+), then replace the AppImage with a wrapper script pointing at AppRun.
+        # No squashfs-tools or Python needed; --appimage-extract is built into every AppImage.
         run: |
           set -euo pipefail
-          mkdir -p ~/.cache/tauri
+          mkdir -p ~/.cache/tauri && cd ~/.cache/tauri
 
-          # Pre-download linuxdeploy into Tauri's cache so the build step uses our patched copy.
-          curl -sSfL -o ~/.cache/tauri/linuxdeploy-x86_64.AppImage \
+          curl -sSfL -o linuxdeploy-x86_64.AppImage \
             "https://github.com/tauri-apps/binary-releases/releases/download/linuxdeploy/linuxdeploy-x86_64.AppImage"
-          chmod +x ~/.cache/tauri/linuxdeploy-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage
 
-          # Locate the squashfs filesystem inside the AppImage (no FUSE required).
-          # Parse ELF section-header fields to find where the runtime ends, then search
-          # forward for the squashfs magic. Scanning from byte 0 gives a false positive
-          # (hsqs appears inside the ELF binary itself at ~36 KB).
-          OFFSET=$(python3 -c "import struct; d=open('$HOME/.cache/tauri/linuxdeploy-x86_64.AppImage','rb').read(); s=struct.unpack_from; n=s('<H',d,60)[0]; o=s('<Q',d,40)[0]+s('<H',d,58)[0]*n if n else 65536; print(next(i for i in range(o,len(d)-4) if d[i:i+4] in(b'hsqs',b'sqsh')))")
-          echo "squashfs offset: $OFFSET"
+          APPIMAGE_EXTRACT_AND_RUN=1 ./linuxdeploy-x86_64.AppImage --appimage-extract
 
-          # Extract, patch patchelf, repack.
-          unsquashfs -o "$OFFSET" -d /tmp/linuxdeploy-extracted ~/.cache/tauri/linuxdeploy-x86_64.AppImage
-          cp /usr/bin/patchelf /tmp/linuxdeploy-extracted/usr/bin/patchelf
-          echo "patchelf in repacked linuxdeploy: $(/tmp/linuxdeploy-extracted/usr/bin/patchelf --version)"
+          cp /usr/bin/patchelf squashfs-root/usr/bin/patchelf
+          echo "patchelf version in patched linuxdeploy: $(squashfs-root/usr/bin/patchelf --version)"
 
-          curl -sSfL -o /tmp/appimage-runtime \
-            "https://github.com/AppImage/AppImageKit/releases/download/continuous/runtime-x86_64"
-          mksquashfs /tmp/linuxdeploy-extracted /tmp/linuxdeploy-new.squashfs \
-            -root-owned -noappend -comp xz -b 1048576 2>&1 | tail -3
-          cat /tmp/appimage-runtime /tmp/linuxdeploy-new.squashfs \
-            > ~/.cache/tauri/linuxdeploy-x86_64.AppImage
-          chmod +x ~/.cache/tauri/linuxdeploy-x86_64.AppImage
-
-          echo "Patched linuxdeploy: $(APPIMAGE_EXTRACT_AND_RUN=1 ~/.cache/tauri/linuxdeploy-x86_64.AppImage --version)"
+          rm linuxdeploy-x86_64.AppImage
+          printf '#!/bin/bash\nexec "%s/.cache/tauri/squashfs-root/AppRun" "$@"\n' \
+            "$HOME" > linuxdeploy-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage
 
       - name: Compile desktop (Linux)
         run: bun run build -- --no-bundle
