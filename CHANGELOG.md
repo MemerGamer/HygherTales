@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.2](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.5.1...hyghertales-v0.5.2) (2026-02-28)
+
+
+### Bug Fixes
+
+* **ci:** simplify linuxdeploy patching using --appimage-extract ([21a255c](https://github.com/MemerGamer/HygherTales/commit/21a255cf767889cc1c09ab7236fac3584e6b33e1))
+
 ## [0.5.1](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.5.0...hyghertales-v0.5.1) (2026-02-28)
 
 
