@@ -153,7 +153,7 @@ jobs:
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libfuse2
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libfuse2 squashfs-tools
 
       - name: Setup Bun
         uses: "oven-sh/setup-bun@v2"
@@ -194,13 +194,59 @@ jobs:
           sudo modprobe fuse
           sudo chmod a+rw /dev/fuse
 
-      - name: Build desktop (Linux)
-        run: bun run build
+      - name: Patch linuxdeploy patchelf (fix Bun sidecar corruption)
+        # linuxdeploy bundles patchelf 0.8 which corrupts large Bun self-contained binaries.
+        # After patchelf 0.8 modifies the sidecar, ldd fails on it and the GTK plugin aborts.
+        # Fix: extract linuxdeploy, replace its patchelf with the system version (0.14+),
+        # and repack it so Tauri picks up the patched copy from cache.
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.cache/tauri
+
+          # Pre-download linuxdeploy into Tauri's cache so the build step uses our patched copy.
+          curl -sSfL -o ~/.cache/tauri/linuxdeploy-x86_64.AppImage \
+            "https://github.com/tauri-apps/binary-releases/releases/download/linuxdeploy/linuxdeploy-x86_64.AppImage"
+          chmod +x ~/.cache/tauri/linuxdeploy-x86_64.AppImage
+
+          # Locate the squashfs filesystem inside the AppImage (no FUSE required).
+          OFFSET=$(python3 -c "
+          data = open('$HOME/.cache/tauri/linuxdeploy-x86_64.AppImage', 'rb').read()
+          for magic in [b'hsqs', b'sqsh']:
+              pos = data.find(magic)
+              if pos > 0:
+                  print(pos)
+                  break
+          ")
+          echo "squashfs offset: $OFFSET"
+
+          # Extract, patch patchelf, repack.
+          unsquashfs -o "$OFFSET" -d /tmp/linuxdeploy-extracted ~/.cache/tauri/linuxdeploy-x86_64.AppImage
+          cp /usr/bin/patchelf /tmp/linuxdeploy-extracted/usr/bin/patchelf
+          echo "patchelf in repacked linuxdeploy: $(/tmp/linuxdeploy-extracted/usr/bin/patchelf --version)"
+
+          curl -sSfL -o /tmp/appimage-runtime \
+            "https://github.com/AppImage/AppImageKit/releases/download/continuous/runtime-x86_64"
+          mksquashfs /tmp/linuxdeploy-extracted /tmp/linuxdeploy-new.squashfs \
+            -root-owned -noappend -comp xz -b 1048576 2>&1 | tail -3
+          cat /tmp/appimage-runtime /tmp/linuxdeploy-new.squashfs \
+            > ~/.cache/tauri/linuxdeploy-x86_64.AppImage
+          chmod +x ~/.cache/tauri/linuxdeploy-x86_64.AppImage
+
+          echo "Patched linuxdeploy: $(APPIMAGE_EXTRACT_AND_RUN=1 ~/.cache/tauri/linuxdeploy-x86_64.AppImage --version)"
+
+      - name: Compile desktop (Linux)
+        run: bun run build -- --no-bundle
+        working-directory: apps/desktop
+
+      - name: Bundle deb and rpm
+        run: bunx tauri bundle --bundles deb,rpm
+        working-directory: apps/desktop
+
+      - name: Bundle AppImage
+        run: bunx tauri bundle --bundles appimage --verbose
         working-directory: apps/desktop
         env:
-          # Allow linuxdeploy AppImage to run in CI without FUSE (extract-and-run)
           APPIMAGE_EXTRACT_AND_RUN: 1
-          # Prevent linuxdeploy from stripping binaries (avoids "failed to run linuxdeploy" in CI)
           NO_STRIP: true
 
       - name: Upload Linux artifacts to release
