@@ -269,6 +269,11 @@ jobs:
           cp apps/desktop/src-tauri/target/release/bundle/deb/*.deb \
              apps/desktop/flatpak/files/app.deb
 
+      - name: Install flatpak-builder
+        run: |
+          sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --if-not-exists --user flathub https://flathub.org/repo/flathub.flatpakrepo
+
       - name: Build Flatpak
         uses: "flatpak/flatpak-github-actions/flatpak-builder@v6"
         with:
