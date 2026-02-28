@@ -208,14 +208,33 @@ jobs:
             "https://github.com/tauri-apps/binary-releases/releases/download/linuxdeploy/linuxdeploy-x86_64.AppImage"
           chmod +x linuxdeploy-x86_64.AppImage
 
-          APPIMAGE_EXTRACT_AND_RUN=1 ./linuxdeploy-x86_64.AppImage --appimage-extract
+          # Extract WITHOUT APPIMAGE_EXTRACT_AND_RUN: that env var causes the runtime to
+          # self-extract to a temp dir first, so squashfs-root would land there instead of here.
+          # --appimage-extract reads squashfs directly from the file; no FUSE needed.
+          ./linuxdeploy-x86_64.AppImage --appimage-extract
 
           cp /usr/bin/patchelf squashfs-root/usr/bin/patchelf
-          echo "patchelf version in patched linuxdeploy: $(squashfs-root/usr/bin/patchelf --version)"
+          echo "patchelf version: $(squashfs-root/usr/bin/patchelf --version)"
 
           rm linuxdeploy-x86_64.AppImage
-          printf '#!/bin/bash\nexec "%s/.cache/tauri/squashfs-root/AppRun" "$@"\n' \
-            "$HOME" > linuxdeploy-x86_64.AppImage
+          # Build wrapper using multiple printf calls (avoids heredoc-in-YAML indentation issues).
+          # Wrapper calls linuxdeploy directly with explicit env, filtering AppImage runtime flags
+          # (--appimage-extract-and-run) that the extracted ELF binary does not understand.
+          {
+            printf '#!/bin/bash\n'
+            printf 'APPDIR="$HOME/.cache/tauri/squashfs-root"\n'
+            printf 'export APPDIR\n'
+            printf 'export PATH="$APPDIR/usr/bin:$PATH"\n'
+            printf 'export LD_LIBRARY_PATH="$APPDIR/usr/lib:${LD_LIBRARY_PATH:-}"\n'
+            printf 'args=()\n'
+            printf 'for arg in "$@"; do\n'
+            printf '  case "$arg" in\n'
+            printf '    --appimage-extract-and-run|--appimage-extract|--appimage-mount) ;;\n'
+            printf '    *) args+=("$arg") ;;\n'
+            printf '  esac\n'
+            printf 'done\n'
+            printf 'exec "$APPDIR/usr/bin/linuxdeploy" "${args[@]}"\n'
+          } > linuxdeploy-x86_64.AppImage
           chmod +x linuxdeploy-x86_64.AppImage
 
       - name: Compile desktop (Linux)
