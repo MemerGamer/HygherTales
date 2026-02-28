@@ -43,13 +43,21 @@ modules:
           find /app/lib/hyghertales-desktop -type f -exec chmod 755 {} \;
         fi
 
-      # Desktop file — rewrite Icon= to the Flatpak app ID
-      - sed -i 's|^Icon=.*|Icon=com.hyghertales.desktop|' deb-extract/usr/share/applications/hyghertales-desktop.desktop
-      - install -Dm644 deb-extract/usr/share/applications/hyghertales-desktop.desktop /app/share/applications/com.hyghertales.desktop.desktop
+      # Desktop file — find whatever .desktop Tauri generated, rewrite Icon=, install it
+      - |
+        desktop_file=$(find deb-extract/usr/share/applications -name '*.desktop' 2>/dev/null | head -1)
+        if [ -n "$desktop_file" ]; then
+          sed -i 's|^Icon=.*|Icon=com.hyghertales.desktop|' "$desktop_file"
+          install -Dm644 "$desktop_file" /app/share/applications/com.hyghertales.desktop.desktop
+        else
+          mkdir -p /app/share/applications
+          printf '[Desktop Entry]\nName=HygherTales\nExec=hyghertales-desktop\nIcon=com.hyghertales.desktop\nType=Application\nCategories=Utility;Game;\n' \
+            > /app/share/applications/com.hyghertales.desktop.desktop
+        fi
 
       # Icons (copy every resolution Tauri generated, rename to app ID)
       - |
-        find deb-extract/usr/share/icons/hicolor -name '*.png' | while read f; do
+        find deb-extract/usr/share/icons/hicolor -name '*.png' 2>/dev/null | while read f; do
           size_dir=$(echo "$f" | sed 's|.*/hicolor/\([^/]*\)/.*|\1|')
           install -Dm644 "$f" "/app/share/icons/hicolor/$size_dir/apps/com.hyghertales.desktop.png" || true
         done
