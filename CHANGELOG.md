@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.4](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.6.3...hyghertales-v0.6.4) (2026-02-28)
+
+
+### Bug Fixes
+
+* **ci:** update Flatpak runtime to version 47 and enhance GitHub Actions workflow for Flatpak builds ([d67f244](https://github.com/MemerGamer/HygherTales/commit/d67f24476ee79a19f14c7dcbcd18bf07c99bf2ed))
+
 ## [0.6.3](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.6.2...hyghertales-v0.6.3) (2026-02-28)
 
 
