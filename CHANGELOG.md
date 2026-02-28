@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.3](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.6.2...hyghertales-v0.6.3) (2026-02-28)
+
+
+### Bug Fixes
+
+* **ci:** correct flatpak remote-add command in GitHub Actions workflow ([231712a](https://github.com/MemerGamer/HygherTales/commit/231712affe849ed645d1463ed55f856ab0584ca3))
+
 ## [0.6.2](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.6.1...hyghertales-v0.6.2) (2026-02-28)
 
 
