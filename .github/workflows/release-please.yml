@@ -209,13 +209,21 @@ jobs:
           chmod +x ~/.cache/tauri/linuxdeploy-x86_64.AppImage
 
           # Locate the squashfs filesystem inside the AppImage (no FUSE required).
+          # Parse the ELF section-header table to find where the runtime binary ends,
+          # then search for the squashfs magic bytes from that point onward.
+          # Scanning from byte 0 produces false positives (hsqs appears inside the ELF itself).
           OFFSET=$(python3 -c "
-          data = open('$HOME/.cache/tauri/linuxdeploy-x86_64.AppImage', 'rb').read()
-          for magic in [b'hsqs', b'sqsh']:
-              pos = data.find(magic)
-              if pos > 0:
-                  print(pos)
-                  break
+import struct
+path = '$HOME/.cache/tauri/linuxdeploy-x86_64.AppImage'
+data = open(path, 'rb').read()
+e_shoff     = struct.unpack_from('<Q', data, 40)[0]
+e_shentsize = struct.unpack_from('<H', data, 58)[0]
+e_shnum     = struct.unpack_from('<H', data, 60)[0]
+min_off = (e_shoff + e_shentsize * e_shnum) if e_shnum else 65536
+for off in range(min_off, len(data) - 4):
+    if data[off:off+4] in (b'hsqs', b'sqsh'):
+        print(off)
+        break
           ")
           echo "squashfs offset: $OFFSET"
 
