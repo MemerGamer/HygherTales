@@ -189,6 +189,10 @@ jobs:
         run: bun run generate-icon-ico
         working-directory: apps/desktop
 
+      - name: Compile desktop (Linux)
+        run: bun run build -- --no-bundle
+        working-directory: apps/desktop
+
       - name: Bundle deb and rpm
         run: bunx tauri bundle --bundles deb,rpm
         working-directory: apps/desktop
@@ -249,6 +253,10 @@ jobs:
 
       - name: Generate icon.ico
         run: bun run generate-icon-ico
+        working-directory: apps/desktop
+
+      - name: Compile desktop (Linux)
+        run: bun run build -- --no-bundle
         working-directory: apps/desktop
 
       - name: Build deb (Flatpak source)
