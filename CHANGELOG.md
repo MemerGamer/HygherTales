@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.1](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.5.0...hyghertales-v0.5.1) (2026-02-28)
+
+
+### Bug Fixes
+
+* **ci:** collapse Python offset script to single line to fix YAML syntax ([3562168](https://github.com/MemerGamer/HygherTales/commit/35621685ce71040d0aee2e09cccd368003c2671d))
+* **ci:** fix squashfs offset detection for linuxdeploy patchelf step ([add18c8](https://github.com/MemerGamer/HygherTales/commit/add18c8e689e5f26f9eec775eb8152eea5ee28c4))
+
 ## [0.5.0](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.4.1...hyghertales-v0.5.0) (2026-02-28)
 
 
