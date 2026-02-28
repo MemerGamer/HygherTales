@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.4.1...hyghertales-v0.5.0) (2026-02-28)
+
+
+### Features
+
+* fix appimage release ([db35fa4](https://github.com/MemerGamer/HygherTales/commit/db35fa44731758a5c8718e4d22a0e7b1528f6ce9))
+
 ## [0.4.1](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.4.0...hyghertales-v0.4.1) (2026-02-24)
 
 
