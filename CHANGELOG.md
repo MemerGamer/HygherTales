@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.3](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.5.2...hyghertales-v0.5.3) (2026-02-28)
+
+
+### Bug Fixes
+
+* **ci:** fix two bugs in linuxdeploy wrapper causing ENOENT ([07f295e](https://github.com/MemerGamer/HygherTales/commit/07f295e40f0503bda8d0ce20901375419094e9a7))
+
 ## [0.5.2](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.5.1...hyghertales-v0.5.2) (2026-02-28)
 
 
