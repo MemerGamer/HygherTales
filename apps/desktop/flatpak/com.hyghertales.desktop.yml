@@ -53,10 +53,13 @@ modules:
             > /app/share/applications/com.hyghertales.desktop.desktop
         fi
 
-      # Icons (copy every resolution Tauri generated, rename to app ID)
+      # Icons — copy Tauri-generated sizes up to 512x512 (Flatpak rejects larger)
       - |
         find deb-extract/usr/share/icons/hicolor -name '*.png' 2>/dev/null | while read f; do
           size_dir=$(echo "$f" | sed 's|.*/hicolor/\([^/]*\)/.*|\1|')
-          install -Dm644 "$f" "/app/share/icons/hicolor/$size_dir/apps/com.hyghertales.desktop.png" || true
+          w=$(echo "$size_dir" | sed 's/[^0-9].*//')
+          if [ -n "$w" ] && [ "$w" -le 512 ]; then
+            install -Dm644 "$f" "/app/share/icons/hicolor/$size_dir/apps/com.hyghertales.desktop.png" || true
+          fi
         done
 

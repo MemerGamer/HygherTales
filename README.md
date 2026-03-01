@@ -33,14 +33,14 @@ Pick the latest release from [releases](https://github.com/MemerGamer/HygherTale
 
 ### Linux: blank or white window
 
-On some setups the AppImage shows a blank/white window (WebKit/EGL issue). Try:
+On some setups a blank/white window appears (WebKit/EGL issue). Try:
 
-1. **Use the .deb or .rpm package** from the same release instead of the AppImage; native packages often avoid this.
-2. If you must use the AppImage, run with:
+1. **Use the .deb or .rpm package** — native packages are the most reliable option.
+2. For the Flatpak, run with:
+
    ```bash
-   WEBKIT_DISABLE_COMPOSITING_MODE=1 GDK_BACKEND=x11 ./HygherTales_*.AppImage
+   WEBKIT_DISABLE_COMPOSITING_MODE=1 flatpak run com.hyghertales.desktop
    ```
-   If it still stays blank, the .deb is the most reliable option.
 
 ## Development guide
 ## Prerequisites
@@ -145,7 +145,8 @@ Desktop can't write to the Mods directory. Use Settings → Validate to create i
 ## Distribution
 
 Release-please manages versions and releases. CI builds:
-- Desktop installers (Windows `.msi`, macOS `.dmg`, Linux `.deb`/`.AppImage`)
+
+- Desktop installers (Windows `.msi`, macOS `.dmg`, Linux `.deb`/`.rpm`/`.flatpak`)
 - Proxy Docker image
 
 See [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) for deployment steps.
