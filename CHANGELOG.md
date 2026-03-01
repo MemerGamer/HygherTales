@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.7](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.6.6...hyghertales-v0.6.7) (2026-03-01)
+
+
+### Bug Fixes
+
+* **flatpak:** remove unnecessary metainfo file installation from Flatpak build process ([a3049a4](https://github.com/MemerGamer/HygherTales/commit/a3049a42f05493f9b47abeb25999e63cd870352a))
+
 ## [0.6.6](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.6.5...hyghertales-v0.6.6) (2026-02-28)
 
 
