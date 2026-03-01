@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.9](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.6.8...hyghertales-v0.6.9) (2026-03-01)
+
+
+### Bug Fixes
+
+* **flatpak:** update socket configuration and disable DMABUF renderer ([1e90f2d](https://github.com/MemerGamer/HygherTales/commit/1e90f2d2a5d7397aae5d1808d2e30121fee6c904))
+
 ## [0.6.8](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.6.7...hyghertales-v0.6.8) (2026-03-01)
 
 
