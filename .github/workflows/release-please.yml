@@ -271,7 +271,7 @@ jobs:
 
       - name: Install flatpak and flatpak-builder
         run: |
-          sudo apt-get install -y flatpak flatpak-builder appstream
+          sudo apt-get install -y flatpak flatpak-builder
           flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
       - name: Install Flatpak runtime (user)
@@ -279,7 +279,7 @@ jobs:
 
       - name: Build Flatpak bundle
         run: |
-          flatpak-builder --user --repo=flatpak-repo --disable-rofiles-fuse --disable-sandbox --force-clean \
+          flatpak-builder --user --repo=flatpak-repo --disable-rofiles-fuse --force-clean \
             flatpak-build-dir apps/desktop/flatpak/com.hyghertales.desktop.yml
           flatpak build-bundle flatpak-repo HygherTales.flatpak com.hyghertales.desktop
 
