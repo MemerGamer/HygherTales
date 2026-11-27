@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.10](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.6.9...hyghertales-v0.6.10) (2026-11-27)
+
+
+### Bug Fixes
+
+* **deps:** patch known vulnerabilities (2026-11-28) ([#28](https://github.com/MemerGamer/HygherTales/issues/28)) ([62757c8](https://github.com/MemerGamer/HygherTales/commit/62757c866f0a4eaedeeb6a413a05ba4d58283ede))
+
 ## [0.6.9](https://github.com/MemerGamer/HygherTales/compare/hyghertales-v0.6.8...hyghertales-v0.6.9) (2026-03-01)
 
 
